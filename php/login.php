@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </head>
 <body class="login-body">
     <div class="login-container">
-        <h1>Portal Manajemen Proyek Konsultan TI</h1>
+        <h1>Proyek Konsultan TI</h1>
         <form method="post">
             <input type="text" name="username" placeholder="Username" required>
             <input type="password" name="password" placeholder="Password" required>

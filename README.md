@@ -28,6 +28,7 @@ Aplikasi ini sekarang mendukung stack modern dengan backend Node.js/Express, fro
 - Import `database.sql` ke MySQL.
 - Gunakan database `project_portal` dan jalankan sample seed data.
 - Skema berada juga di `backend/sql/schema.sql`.
+- Jika database lama sudah terlanjur dibuat, jalankan `backend/sql/migration_dynamic_dashboard.sql` untuk menambah tabel dashboard dinamis tanpa menghapus data.
 
 ## Login Sample
 - PM: `adminfairy` / `adminfairy`
@@ -46,6 +47,12 @@ Aplikasi ini sekarang mendukung stack modern dengan backend Node.js/Express, fro
 - `DELETE /api/tasks/:id` (PM)
 - `GET /api/users` (PM)
 - `GET /api/users/me`
+- `GET|POST|PUT|DELETE /api/project-links` (dashboard link proyek)
+- `GET|POST|PUT|DELETE /api/risks` (risk register)
+- `GET|POST|DELETE /api/time-logs` (time tracking dan resource utilization)
+- `GET|POST|DELETE /api/task-dependencies` (dependensi tugas)
+- `GET|POST|PUT|DELETE /api/project-files` (metadata file repository)
+- `GET|POST|DELETE /api/task-comments` (communication log)
 
 ## Catatan Pengembangan
 - Gunakan role `pm`, `dev`, `client`.

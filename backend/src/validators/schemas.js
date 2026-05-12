@@ -17,9 +17,10 @@ const projectCreateSchema = z.object({
   description: z.string().optional(),
   start_date: z.string().optional(),
   end_date: z.string().optional(),
-  status: z.enum(['planning', 'in_progress', 'completed', 'on_hold']).optional(),
+  status: z.enum(['planning', 'in_progress', 'completed', 'on_hold', 'on_track', 'at_risk', 'delayed']).optional(),
   client_id: z.number().int().optional(),
-  pm_id: z.number().int().optional()
+  pm_id: z.number().int().optional(),
+  cover_image_url: z.string().url().optional().or(z.literal(''))
 });
 
 const taskCreateSchema = z.object({
@@ -45,6 +46,52 @@ const teamCreateSchema = z.object({
   member_ids: z.array(z.number().int()).optional()
 });
 
+const projectLinkSchema = z.object({
+  project_id: z.number().int().optional().nullable(),
+  title: z.string().min(2),
+  url: z.string().url(),
+  type: z.enum(['api_docs', 'brd', 'repository', 'staging', 'other']).default('other'),
+  sort_order: z.number().int().min(0).optional()
+});
+
+const riskSchema = z.object({
+  project_id: z.number().int(),
+  title: z.string().min(3),
+  description: z.string().optional(),
+  probability: z.enum(['low', 'medium', 'high']).default('medium'),
+  impact: z.enum(['low', 'medium', 'high']).default('medium'),
+  mitigation: z.string().optional(),
+  status: z.enum(['open', 'mitigating', 'resolved']).default('open'),
+  owner_id: z.number().int().optional().nullable(),
+  due_date: z.string().optional().nullable()
+});
+
+const timeLogSchema = z.object({
+  user_id: z.number().int().optional(),
+  task_id: z.number().int(),
+  hours: z.number().positive().max(24),
+  log_date: z.string().optional()
+});
+
+const taskDependencySchema = z.object({
+  task_id: z.number().int(),
+  depends_on_task_id: z.number().int()
+}).refine((value) => value.task_id !== value.depends_on_task_id, {
+  message: 'Task cannot depend on itself'
+});
+
+const projectFileSchema = z.object({
+  project_id: z.number().int(),
+  title: z.string().min(2),
+  file_url: z.string().url(),
+  file_type: z.string().min(2).max(50).optional()
+});
+
+const taskCommentSchema = z.object({
+  task_id: z.number().int(),
+  comment: z.string().min(2)
+});
+
 function parseSchema(schema, body) {
   try {
     return { data: schema.parse(body) };
@@ -53,4 +100,18 @@ function parseSchema(schema, body) {
   }
 }
 
-module.exports = { loginSchema, userCreateSchema, projectCreateSchema, taskCreateSchema, parseSchema };
+module.exports = {
+  loginSchema,
+  userCreateSchema,
+  projectCreateSchema,
+  taskCreateSchema,
+  milestoneCreateSchema,
+  teamCreateSchema,
+  projectLinkSchema,
+  riskSchema,
+  timeLogSchema,
+  taskDependencySchema,
+  projectFileSchema,
+  taskCommentSchema,
+  parseSchema
+};

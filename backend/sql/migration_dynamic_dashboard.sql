@@ -1,46 +1,23 @@
--- Backend schema for project portal
--- Use MySQL and import into database named project_portal
-
-CREATE DATABASE IF NOT EXISTS project_portal;
 USE project_portal;
 
-CREATE TABLE IF NOT EXISTS users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(50) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  email VARCHAR(100) UNIQUE NOT NULL,
-  role ENUM('pm','dev','client') NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+ALTER TABLE projects
+  MODIFY status ENUM('planning','in_progress','completed','on_hold','on_track','at_risk','delayed') DEFAULT 'planning';
 
-CREATE TABLE IF NOT EXISTS projects (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  description TEXT,
-  start_date DATE,
-  end_date DATE,
-  status ENUM('planning','in_progress','completed','on_hold','on_track','at_risk','delayed') DEFAULT 'planning',
-  client_id INT,
-  pm_id INT,
-  cover_image_url VARCHAR(500),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (client_id) REFERENCES users(id),
-  FOREIGN KEY (pm_id) REFERENCES users(id)
+SET @has_cover_image_url = (
+  SELECT COUNT(*)
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'projects'
+    AND COLUMN_NAME = 'cover_image_url'
 );
-
-CREATE TABLE IF NOT EXISTS tasks (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  project_id INT,
-  name VARCHAR(100) NOT NULL,
-  description TEXT,
-  assigned_to INT,
-  status ENUM('todo','in_progress','done') DEFAULT 'todo',
-  progress INT DEFAULT 0,
-  due_date DATE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (project_id) REFERENCES projects(id),
-  FOREIGN KEY (assigned_to) REFERENCES users(id)
+SET @cover_image_sql = IF(
+  @has_cover_image_url = 0,
+  'ALTER TABLE projects ADD COLUMN cover_image_url VARCHAR(500) NULL',
+  'SELECT 1'
 );
+PREPARE cover_image_stmt FROM @cover_image_sql;
+EXECUTE cover_image_stmt;
+DEALLOCATE PREPARE cover_image_stmt;
 
 CREATE TABLE IF NOT EXISTS milestones (
   id INT AUTO_INCREMENT PRIMARY KEY,

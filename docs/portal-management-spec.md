@@ -1,6 +1,6 @@
 # Portal Manajemen Proyek untuk Konsultan TI
 
-Membangun sebuah **Portal Manajemen Proyek** khusus untuk konsultan TI memerlukan keseimbangan antara transparansi teknis bagi pengembang dan visibilitas strategis bagi klien.
+Membangun sebuah **Portal Manajemen Proyek** khusus untuk konsultan TI memerlukan keseimbangan antara transparansi teknis bagi pengembang dan visibilitas strategis bagi client.
 
 ---
 
@@ -60,7 +60,7 @@ Setiap pengguna melihat data yang berbeda sesuai kepentingan mereka:
 * Mengunggah hasil pekerjaan atau memperbarui status *bug*.
 * Melaporkan kendala teknis (impediments).
 
-### **C. Klien (Visibility & Approval)**
+### **C. Client (Visibility & Approval)**
 * Melihat progres *high-level* (Milestone).
 * Melakukan *User Acceptance Testing* (UAT) dan memberikan approval.
 * Melihat laporan penggunaan jam kerja (jika model kontraknya adalah *Time & Material*).

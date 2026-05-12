@@ -36,10 +36,10 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
-    const { name, description, start_date, end_date, status, client_id, pm_id } = data;
+    const { name, description, start_date, end_date, status, client_id, pm_id, cover_image_url } = data;
     const [result] = await pool.query(
-      'INSERT INTO projects (name, description, start_date, end_date, status, client_id, pm_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, description, start_date || null, end_date || null, status || 'planning', client_id || null, pm_id || req.user.id]
+      'INSERT INTO projects (name, description, start_date, end_date, status, client_id, pm_id, cover_image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, description, start_date || null, end_date || null, status || 'planning', client_id || null, pm_id || req.user.id, cover_image_url || null]
     );
 
     const [projectRows] = await pool.query('SELECT * FROM projects WHERE id = ?', [result.insertId]);
@@ -62,8 +62,11 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
       updates.push(`${key} = ?`);
       params.push(value);
     });
-    params.push(projectId);
-    await pool.query(`UPDATE projects SET ${updates.join(', ')} WHERE id = ?`, params);
+    params.push(projectId, req.user.id);
+    const [result] = await pool.query(`UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND pm_id = ?`, params);
+    if (!result.affectedRows) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
     const [rows] = await pool.query('SELECT * FROM projects WHERE id = ?', [projectId]);
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -74,7 +77,10 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const projectId = Number(req.params.id);
-    await pool.query('DELETE FROM projects WHERE id = ?', [projectId]);
+    const [result] = await pool.query('DELETE FROM projects WHERE id = ? AND pm_id = ?', [projectId, req.user.id]);
+    if (!result.affectedRows) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
     res.json({ success: true, data: { id: projectId } });
   } catch (err) {
     next(err);

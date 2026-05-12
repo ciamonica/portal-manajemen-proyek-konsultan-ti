@@ -78,14 +78,28 @@ router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
+    const safeData = req.user.role === 'dev'
+      ? Object.fromEntries(Object.entries(data).filter(([key]) => ['status', 'progress'].includes(key)))
+      : data;
     const updates = [];
     const params = [];
-    Object.entries(data).forEach(([key, value]) => {
-      updates.push(`${key} = ?`);
+    Object.entries(safeData).forEach(([key, value]) => {
+      updates.push(`t.${key} = ?`);
       params.push(value);
     });
-    params.push(taskId);
-    await pool.query(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, params);
+    if (!updates.length) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+
+    params.push(taskId, req.user.id);
+    const accessClause = req.user.role === 'pm' ? 'p.pm_id = ?' : 't.assigned_to = ?';
+    const [result] = await pool.query(
+      `UPDATE tasks t JOIN projects p ON t.project_id = p.id SET ${updates.join(', ')} WHERE t.id = ? AND ${accessClause}`,
+      params
+    );
+    if (!result.affectedRows) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
     const [rows] = await pool.query('SELECT * FROM tasks WHERE id = ?', [taskId]);
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -96,7 +110,13 @@ router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const taskId = Number(req.params.id);
-    await pool.query('DELETE FROM tasks WHERE id = ?', [taskId]);
+    const [result] = await pool.query(
+      'DELETE t FROM tasks t JOIN projects p ON t.project_id = p.id WHERE t.id = ? AND p.pm_id = ?',
+      [taskId, req.user.id]
+    );
+    if (!result.affectedRows) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
     res.json({ success: true, data: { id: taskId } });
   } catch (err) {
     next(err);

@@ -8,6 +8,12 @@ const projectsRouter = require('./routes/projects');
 const tasksRouter = require('./routes/tasks');
 const milestonesRouter = require('./routes/milestones');
 const teamsRouter = require('./routes/teams');
+const projectLinksRouter = require('./routes/projectLinks');
+const risksRouter = require('./routes/risks');
+const timeLogsRouter = require('./routes/timeLogs');
+const taskDependenciesRouter = require('./routes/taskDependencies');
+const projectFilesRouter = require('./routes/projectFiles');
+const taskCommentsRouter = require('./routes/taskComments');
 const { authenticateToken } = require('./middleware/auth');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -26,6 +32,12 @@ app.use('/api/projects', authenticateToken, projectsRouter);
 app.use('/api/tasks', authenticateToken, tasksRouter);
 app.use('/api/milestones', authenticateToken, milestonesRouter);
 app.use('/api/teams', authenticateToken, teamsRouter);
+app.use('/api/project-links', authenticateToken, projectLinksRouter);
+app.use('/api/risks', authenticateToken, risksRouter);
+app.use('/api/time-logs', authenticateToken, timeLogsRouter);
+app.use('/api/task-dependencies', authenticateToken, taskDependenciesRouter);
+app.use('/api/project-files', authenticateToken, projectFilesRouter);
+app.use('/api/task-comments', authenticateToken, taskCommentsRouter);
 
 app.use(errorHandler);
 
