@@ -49,6 +49,12 @@ const RISK_STATUS_LABELS = {
   resolved: 'Selesai'
 };
 
+const ROLE_LABELS = {
+  pm: 'Project Manager',
+  dev: 'Developer',
+  client: 'Client'
+};
+
 function labelFrom(map, value) {
   return map[value] || value || '-';
 }
@@ -290,7 +296,7 @@ export default function Dashboard() {
   const [taskDependencies, setTaskDependencies] = useState([]);
   const [projectFiles, setProjectFiles] = useState([]);
   const [taskComments, setTaskComments] = useState([]);
-  const [filters, setFilters] = useState({ status: '', fromDate: '', toDate: '' });
+  const [filters, setFilters] = useState({ status: '', role: '', fromDate: '', toDate: '' });
   const [loading, setLoading] = useState(false);
   const [projectForm, setProjectForm] = useState({ name: '', description: '', start_date: '', end_date: '', status: 'planning', client_id: '', pm_id: '', cover_image_url: '' });
   const [taskForm, setTaskForm] = useState({ project_id: '', name: '', description: '', assigned_to: '', status: 'todo', progress: 0, due_date: '' });
@@ -381,11 +387,13 @@ export default function Dashboard() {
 
   const filteredTasks = useMemo(() => tasks.filter((task) => {
     const dueDate = toDateInput(task.due_date);
+    const assignedRole = task.assigned_role || users.find((entry) => Number(entry.id) === Number(task.assigned_to))?.role || '';
     if (filters.status && task.status !== filters.status) return false;
+    if (filters.role && assignedRole !== filters.role) return false;
     if (filters.fromDate && (!dueDate || dueDate < filters.fromDate)) return false;
     if (filters.toDate && (!dueDate || dueDate > filters.toDate)) return false;
     return true;
-  }), [tasks, filters]);
+  }), [tasks, users, filters]);
 
   const { statusCounts, projectStatus } = dashboardStats(filteredTasks, projects);
 
@@ -941,13 +949,14 @@ export default function Dashboard() {
   };
 
   const exportTasksCsv = () => {
-    const header = ['Tugas', 'Proyek', 'Status', 'Penanggung Jawab', 'Tenggat'];
+    const header = ['Tugas', 'Proyek', 'Status', 'Peran', 'Penanggung Jawab', 'Tenggat'];
     const rows = filteredTasks.map((task) => [
       task.name,
       task.project_name || '-',
       labelFrom(TASK_STATUS_LABELS, task.status),
+      labelFrom(ROLE_LABELS, task.assigned_role || users.find((entry) => Number(entry.id) === Number(task.assigned_to))?.role),
       task.assigned_username || 'Belum ditugaskan',
-      task.due_date || '-'
+      toDateInput(task.due_date) || '-'
     ]);
     const csvContent = [header, ...rows].map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -2319,6 +2328,15 @@ export default function Dashboard() {
             </select>
           </label>
           <label className="filter-field">
+            <span>Peran</span>
+            <select value={filters.role} onChange={(e) => setFilters(prev => ({ ...prev, role: e.target.value }))}>
+              <option value="">Semua Peran</option>
+              <option value="pm">Project Manager</option>
+              <option value="dev">Developer</option>
+              <option value="client">Client</option>
+            </select>
+          </label>
+          <label className="filter-field">
             <span>Dari</span>
             <input type="date" value={filters.fromDate} onChange={(e) => setFilters(prev => ({ ...prev, fromDate: e.target.value }))} />
           </label>
@@ -2353,6 +2371,7 @@ export default function Dashboard() {
                   <th>Nama</th>
                   <th>Proyek</th>
                   <th>Status</th>
+                  <th>Peran</th>
                   <th>Tenggat</th>
                 </tr>
               </thead>
@@ -2362,6 +2381,7 @@ export default function Dashboard() {
                     <td>{task.name}</td>
                     <td>{task.project_name || '-'}</td>
                     <td>{labelFrom(TASK_STATUS_LABELS, task.status)}</td>
+                    <td>{labelFrom(ROLE_LABELS, task.assigned_role || users.find((entry) => Number(entry.id) === Number(task.assigned_to))?.role)}</td>
                     <td>{formatDate(task.due_date)}</td>
                   </tr>
                 ))}

@@ -1,9 +1,5 @@
 const jwt = require('jsonwebtoken');
-const dotenv = require('dotenv');
-
-dotenv.config();
-
-const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
+const { getJwtSecret } = require('../config/authConfig');
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization || req.cookies?.token;
@@ -14,7 +10,7 @@ function authenticateToken(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, getJwtSecret());
     req.user = payload;
     next();
   } catch (error) {

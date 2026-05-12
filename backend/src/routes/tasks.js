@@ -11,7 +11,7 @@ router.get('/', async (req, res, next) => {
     const userId = req.user.id;
     const { projectId, status, fromDate, toDate } = req.query;
 
-    let baseQuery = 'SELECT t.*, p.name AS project_name, u.username AS assigned_username FROM tasks t LEFT JOIN projects p ON t.project_id = p.id LEFT JOIN users u ON t.assigned_to = u.id';
+    let baseQuery = 'SELECT t.*, p.name AS project_name, u.username AS assigned_username, u.role AS assigned_role FROM tasks t LEFT JOIN projects p ON t.project_id = p.id LEFT JOIN users u ON t.assigned_to = u.id';
     const filters = [];
     const params = [];
 

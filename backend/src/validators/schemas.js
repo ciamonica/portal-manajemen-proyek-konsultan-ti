@@ -5,9 +5,15 @@ const loginSchema = z.object({
   password: z.string().min(8)
 });
 
+const passwordPolicySchema = z.string()
+  .min(8, 'Password minimal 8 karakter')
+  .regex(/[a-z]/, 'Password harus memiliki huruf kecil')
+  .regex(/[A-Z]/, 'Password harus memiliki huruf besar')
+  .regex(/[0-9]/, 'Password harus memiliki angka');
+
 const userCreateSchema = z.object({
   username: z.string().min(3),
-  password: z.string().min(8),
+  password: passwordPolicySchema,
   email: z.string().email(),
   role: z.enum(['pm', 'dev', 'client'])
 });

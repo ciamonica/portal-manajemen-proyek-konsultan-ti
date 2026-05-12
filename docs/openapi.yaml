@@ -1,0 +1,502 @@
+openapi: 3.0.3
+info:
+  title: Portal Manajemen Proyek API
+  version: 1.0.0
+  description: REST API untuk autentikasi, RBAC, CRUD proyek, tugas, dashboard, risiko, time tracking, file, dan komentar.
+servers:
+  - url: http://localhost:4000/api
+    description: Local development
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Users
+  - name: Projects
+  - name: Tasks
+  - name: Dashboard
+paths:
+  /health:
+    get:
+      security: []
+      tags: [Dashboard]
+      summary: Health check API
+      responses:
+        "200":
+          description: API aktif
+  /auth/login:
+    post:
+      security: []
+      tags: [Auth]
+      summary: Login user dan menerima JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  example: adminfairy
+                password:
+                  type: string
+                  example: adminfairy
+      responses:
+        "200":
+          description: Login berhasil
+        "400":
+          description: Payload tidak valid
+        "401":
+          description: Kredensial salah
+  /users:
+    get:
+      tags: [Users]
+      summary: Daftar user, hanya Project Manager
+      responses:
+        "200":
+          description: Daftar user
+        "403":
+          description: Role tidak diizinkan
+    post:
+      tags: [Users]
+      summary: Membuat user baru, hanya Project Manager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        "201":
+          description: User dibuat
+        "400":
+          description: Payload tidak valid
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Profil user login
+      responses:
+        "200":
+          description: Data user login
+  /projects:
+    get:
+      tags: [Projects]
+      summary: Daftar proyek sesuai role user login
+      responses:
+        "200":
+          description: Daftar proyek terfilter RBAC
+    post:
+      tags: [Projects]
+      summary: Membuat proyek, hanya Project Manager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Proyek dibuat
+        "403":
+          description: Role tidak diizinkan
+  /projects/{id}:
+    put:
+      tags: [Projects]
+      summary: Mengubah proyek milik Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "200":
+          description: Proyek diperbarui
+    delete:
+      tags: [Projects]
+      summary: Menghapus proyek milik Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Proyek dihapus
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: Daftar tugas sesuai role, status, projectId, dan rentang tanggal
+      parameters:
+        - in: query
+          name: projectId
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [todo, in_progress, done]
+        - in: query
+          name: fromDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: toDate
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Daftar tugas terfilter
+    post:
+      tags: [Tasks]
+      summary: Membuat tugas, hanya Project Manager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Tugas dibuat
+  /tasks/{id}:
+    put:
+      tags: [Tasks]
+      summary: PM mengubah tugas, Developer mengubah status/progress tugasnya
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "200":
+          description: Tugas diperbarui
+    delete:
+      tags: [Tasks]
+      summary: Menghapus tugas, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Tugas dihapus
+  /milestones:
+    get:
+      tags: [Dashboard]
+      summary: Daftar milestone sesuai role
+      responses:
+        "200":
+          description: Daftar milestone
+    post:
+      tags: [Dashboard]
+      summary: Membuat milestone, hanya Project Manager
+      responses:
+        "201":
+          description: Milestone dibuat
+  /teams:
+    get:
+      tags: [Dashboard]
+      summary: Daftar tim dan anggota
+      responses:
+        "200":
+          description: Daftar tim
+    post:
+      tags: [Dashboard]
+      summary: Membuat tim, hanya Project Manager
+      responses:
+        "201":
+          description: Tim dibuat
+  /project-links:
+    get:
+      tags: [Dashboard]
+      summary: Link dokumentasi, repository, BRD, staging sesuai akses proyek
+      responses:
+        "200":
+          description: Daftar link
+    post:
+      tags: [Dashboard]
+      summary: Membuat quick link, hanya Project Manager
+      responses:
+        "201":
+          description: Link dibuat
+  /risks:
+    get:
+      tags: [Dashboard]
+      summary: Risk register sesuai akses proyek
+      responses:
+        "200":
+          description: Daftar risiko
+    post:
+      tags: [Dashboard]
+      summary: Membuat risiko, hanya Project Manager
+      responses:
+        "201":
+          description: Risiko dibuat
+  /time-logs:
+    get:
+      tags: [Dashboard]
+      summary: Time tracking dan resource utilization sesuai role
+      responses:
+        "200":
+          description: Daftar log waktu
+    post:
+      tags: [Dashboard]
+      summary: Membuat log waktu, Project Manager atau Developer
+      responses:
+        "201":
+          description: Log waktu dibuat
+  /task-dependencies:
+    get:
+      tags: [Dashboard]
+      summary: Dependensi tugas sesuai akses proyek
+      responses:
+        "200":
+          description: Daftar dependensi
+    post:
+      tags: [Dashboard]
+      summary: Membuat dependensi tugas, hanya Project Manager
+      responses:
+        "201":
+          description: Dependensi dibuat
+  /project-files:
+    get:
+      tags: [Dashboard]
+      summary: Metadata file repository sesuai akses proyek
+      responses:
+        "200":
+          description: Daftar file
+    post:
+      tags: [Dashboard]
+      summary: Membuat metadata file, hanya Project Manager
+      responses:
+        "201":
+          description: File dibuat
+  /task-comments:
+    get:
+      tags: [Dashboard]
+      summary: Komentar tugas sesuai akses proyek
+      responses:
+        "200":
+          description: Daftar komentar
+    post:
+      tags: [Dashboard]
+      summary: Membuat komentar tugas
+      responses:
+        "201":
+          description: Komentar dibuat
+  /milestones/{id}:
+    put:
+      tags: [Dashboard]
+      summary: Mengubah milestone, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Milestone diperbarui
+    delete:
+      tags: [Dashboard]
+      summary: Menghapus milestone, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Milestone dihapus
+  /teams/{id}:
+    put:
+      tags: [Dashboard]
+      summary: Mengubah tim, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Tim diperbarui
+    delete:
+      tags: [Dashboard]
+      summary: Menghapus tim, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Tim dihapus
+  /project-links/{id}:
+    put:
+      tags: [Dashboard]
+      summary: Mengubah quick link, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Link diperbarui
+    delete:
+      tags: [Dashboard]
+      summary: Menghapus quick link, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Link dihapus
+  /risks/{id}:
+    put:
+      tags: [Dashboard]
+      summary: Mengubah risiko, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Risiko diperbarui
+    delete:
+      tags: [Dashboard]
+      summary: Menghapus risiko, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Risiko dihapus
+  /time-logs/{id}:
+    put:
+      tags: [Dashboard]
+      summary: Mengubah log waktu, Project Manager atau pemilik log Developer
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Log waktu diperbarui
+    delete:
+      tags: [Dashboard]
+      summary: Menghapus log waktu, Project Manager atau pemilik log Developer
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Log waktu dihapus
+  /task-dependencies/{id}:
+    put:
+      tags: [Dashboard]
+      summary: Mengubah dependensi tugas, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Dependensi diperbarui
+    delete:
+      tags: [Dashboard]
+      summary: Menghapus dependensi tugas, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Dependensi dihapus
+  /project-files/{id}:
+    put:
+      tags: [Dashboard]
+      summary: Mengubah metadata file, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: File diperbarui
+    delete:
+      tags: [Dashboard]
+      summary: Menghapus metadata file, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: File dihapus
+  /task-comments/{id}:
+    put:
+      tags: [Dashboard]
+      summary: Mengubah komentar oleh pembuat komentar atau Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Komentar diperbarui
+    delete:
+      tags: [Dashboard]
+      summary: Menghapus komentar, hanya Project Manager
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Komentar dihapus
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+  schemas:
+    UserCreate:
+      type: object
+      required: [username, password, email, role]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          description: Minimal 8 karakter, huruf besar, huruf kecil, dan angka.
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [pm, dev, client]
+    ProjectInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [planning, in_progress, completed, on_hold, on_track, at_risk, delayed]
+        client_id:
+          type: integer
+        pm_id:
+          type: integer
+        cover_image_url:
+          type: string
+          format: uri
+    TaskInput:
+      type: object
+      required: [project_id, name]
+      properties:
+        project_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        assigned_to:
+          type: integer
+        status:
+          type: string
+          enum: [todo, in_progress, done]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        due_date:
+          type: string
+          format: date

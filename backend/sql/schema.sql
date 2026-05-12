@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
   password VARCHAR(255) NOT NULL,
   email VARCHAR(100) UNIQUE NOT NULL,
   role ENUM('pm','dev','client') NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_users_role (role)
 );
 
 CREATE TABLE IF NOT EXISTS projects (
@@ -24,6 +25,9 @@ CREATE TABLE IF NOT EXISTS projects (
   pm_id INT,
   cover_image_url VARCHAR(500),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_projects_pm_status (pm_id, status),
+  KEY idx_projects_client_status (client_id, status),
+  KEY idx_projects_dates (start_date, end_date),
   FOREIGN KEY (client_id) REFERENCES users(id),
   FOREIGN KEY (pm_id) REFERENCES users(id)
 );
@@ -38,6 +42,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   progress INT DEFAULT 0,
   due_date DATE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_tasks_project_status (project_id, status),
+  KEY idx_tasks_assignee_status (assigned_to, status),
+  KEY idx_tasks_due_date (due_date),
   FOREIGN KEY (project_id) REFERENCES projects(id),
   FOREIGN KEY (assigned_to) REFERENCES users(id)
 );
@@ -50,6 +57,7 @@ CREATE TABLE IF NOT EXISTS milestones (
   due_date DATE,
   status ENUM('pending','achieved') DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_milestones_project_status_due (project_id, status, due_date),
   FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 
@@ -63,6 +71,7 @@ CREATE TABLE IF NOT EXISTS team_members (
   team_id INT,
   user_id INT,
   PRIMARY KEY (team_id, user_id),
+  KEY idx_team_members_user (user_id),
   FOREIGN KEY (team_id) REFERENCES teams(id),
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
@@ -75,6 +84,8 @@ CREATE TABLE IF NOT EXISTS project_links (
   type ENUM('api_docs','brd','repository','staging','other') DEFAULT 'other',
   sort_order INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_project_links_project_type (project_id, type),
+  KEY idx_project_links_sort_order (sort_order),
   FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 
@@ -90,6 +101,8 @@ CREATE TABLE IF NOT EXISTS risks (
   owner_id INT NULL,
   due_date DATE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_risks_project_status_impact (project_id, status, impact),
+  KEY idx_risks_owner_due (owner_id, due_date),
   FOREIGN KEY (project_id) REFERENCES projects(id),
   FOREIGN KEY (owner_id) REFERENCES users(id)
 );
@@ -100,6 +113,7 @@ CREATE TABLE IF NOT EXISTS task_dependencies (
   depends_on_task_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY unique_task_dependency (task_id, depends_on_task_id),
+  KEY idx_task_dependencies_depends_on (depends_on_task_id),
   FOREIGN KEY (task_id) REFERENCES tasks(id),
   FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id)
 );
@@ -111,6 +125,8 @@ CREATE TABLE IF NOT EXISTS time_logs (
   hours DECIMAL(5,2) NOT NULL,
   log_date DATE NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_time_logs_user_date (user_id, log_date),
+  KEY idx_time_logs_task_date (task_id, log_date),
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (task_id) REFERENCES tasks(id)
 );
@@ -123,6 +139,8 @@ CREATE TABLE IF NOT EXISTS project_files (
   file_type VARCHAR(50) DEFAULT 'dokumen',
   uploaded_by INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_project_files_project_type (project_id, file_type),
+  KEY idx_project_files_uploaded_by (uploaded_by),
   FOREIGN KEY (project_id) REFERENCES projects(id),
   FOREIGN KEY (uploaded_by) REFERENCES users(id)
 );
@@ -133,6 +151,8 @@ CREATE TABLE IF NOT EXISTS task_comments (
   user_id INT NOT NULL,
   comment TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_task_comments_task_created (task_id, created_at),
+  KEY idx_task_comments_user (user_id),
   FOREIGN KEY (task_id) REFERENCES tasks(id),
   FOREIGN KEY (user_id) REFERENCES users(id)
 );

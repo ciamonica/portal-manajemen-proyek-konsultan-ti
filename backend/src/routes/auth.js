@@ -3,12 +3,9 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const { loginSchema, parseSchema } = require('../validators/schemas');
-const dotenv = require('dotenv');
+const { getJwtSecret, getJwtExpiresIn } = require('../config/authConfig');
 
-dotenv.config();
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
 
 router.post('/login', async (req, res, next) => {
   try {
@@ -28,7 +25,11 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: user.id, role: user.role, username: user.username }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const token = jwt.sign(
+      { id: user.id, role: user.role, username: user.username },
+      getJwtSecret(),
+      { expiresIn: getJwtExpiresIn() }
+    );
     res.json({ success: true, data: { token, user: { id: user.id, username: user.username, email: user.email, role: user.role } } });
   } catch (err) {
     next(err);

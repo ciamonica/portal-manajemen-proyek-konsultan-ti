@@ -727,7 +727,7 @@ button {
 
 .filters-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1.15fr) minmax(160px, 0.85fr) minmax(160px, 0.85fr) auto;
+  grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) minmax(150px, 0.85fr) minmax(150px, 0.85fr) auto;
   gap: 12px;
   align-items: end;
 }

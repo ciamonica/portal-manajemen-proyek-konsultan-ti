@@ -4,24 +4,34 @@ import { apiClient } from '../api/api.js';
 
 const AuthContext = createContext(null);
 
+function readStoredUser() {
+  try {
+    const storedUser = localStorage.getItem('project_portal_user');
+    return storedUser ? JSON.parse(storedUser) : null;
+  } catch (error) {
+    localStorage.removeItem('project_portal_user');
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const stored = localStorage.getItem('project_portal_user');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [user, setUser] = useState(readStoredUser);
   const navigate = useNavigate();
 
   useEffect(() => {
-    localStorage.setItem('project_portal_user', JSON.stringify(user || null));
-  }, [user]);
+    const token = localStorage.getItem('project_portal_token');
+    if (token) return;
+    localStorage.removeItem('project_portal_user');
+    setUser(null);
+  }, []);
 
   const login = async (credentials) => {
     const response = await apiClient.post('/auth/login', credentials);
     if (!response.success) {
       throw new Error(response.error || 'Login failed');
     }
-    setUser(response.data.user);
     localStorage.setItem('project_portal_token', response.data.token);
+    localStorage.setItem('project_portal_user', JSON.stringify(response.data.user));
     setUser(response.data.user);
     return response.data.user;
   };

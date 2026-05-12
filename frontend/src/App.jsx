@@ -42,12 +42,6 @@ function App() {
               <span>{NAVBAR_NAME}</span>
             </Link>
             <div className="top-nav-actions">
-              <div className="top-nav-links">
-                <Link to="/#projects-section">Proyek</Link>
-                <Link to="/#tasks-section">Tugas</Link>
-                <Link to="/#milestones-section">Milestone</Link>
-                <Link to="/#teams-section">Tim</Link>
-              </div>
               <button className="outline-button" onClick={logout}>Logout</button>
             </div>
           </div>

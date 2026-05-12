@@ -1,175 +1,38 @@
--- Database Schema for Portal Manajemen Proyek Konsultan TI
--- Import this file into XAMPP MySQL
+-- Rich demo data for Portal Manajemen Proyek Konsultan TI
+-- Run this after schema creation to replace old sample data.
 
-CREATE DATABASE IF NOT EXISTS project_portal;
 USE project_portal;
 
--- Users table
-CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    role ENUM('pm', 'dev', 'client') NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_users_role (role)
-);
+SET FOREIGN_KEY_CHECKS = 0;
 
--- Projects table
-CREATE TABLE projects (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    start_date DATE,
-    end_date DATE,
-    status ENUM('planning', 'in_progress', 'completed', 'on_hold', 'on_track', 'at_risk', 'delayed') DEFAULT 'planning',
-    client_id INT,
-    pm_id INT,
-    cover_image_url VARCHAR(500),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_projects_pm_status (pm_id, status),
-    KEY idx_projects_client_status (client_id, status),
-    KEY idx_projects_dates (start_date, end_date),
-    FOREIGN KEY (client_id) REFERENCES users(id),
-    FOREIGN KEY (pm_id) REFERENCES users(id)
-);
+DELETE FROM task_comments;
+DELETE FROM time_logs;
+DELETE FROM task_dependencies;
+DELETE FROM project_files;
+DELETE FROM risks;
+DELETE FROM project_links;
+DELETE FROM team_members;
+DELETE FROM milestones;
+DELETE FROM tasks;
+DELETE FROM teams;
+DELETE FROM projects;
+DELETE FROM users;
 
--- Tasks table
-CREATE TABLE tasks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    project_id INT,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    assigned_to INT,
-    status ENUM('todo', 'in_progress', 'done') DEFAULT 'todo',
-    progress INT DEFAULT 0,
-    due_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_tasks_project_status (project_id, status),
-    KEY idx_tasks_assignee_status (assigned_to, status),
-    KEY idx_tasks_due_date (due_date),
-    FOREIGN KEY (project_id) REFERENCES projects(id),
-    FOREIGN KEY (assigned_to) REFERENCES users(id)
-);
+ALTER TABLE task_comments AUTO_INCREMENT = 1;
+ALTER TABLE time_logs AUTO_INCREMENT = 1;
+ALTER TABLE task_dependencies AUTO_INCREMENT = 1;
+ALTER TABLE project_files AUTO_INCREMENT = 1;
+ALTER TABLE risks AUTO_INCREMENT = 1;
+ALTER TABLE project_links AUTO_INCREMENT = 1;
+ALTER TABLE milestones AUTO_INCREMENT = 1;
+ALTER TABLE tasks AUTO_INCREMENT = 1;
+ALTER TABLE teams AUTO_INCREMENT = 1;
+ALTER TABLE projects AUTO_INCREMENT = 1;
+ALTER TABLE users AUTO_INCREMENT = 1;
 
--- Milestones table
-CREATE TABLE milestones (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    project_id INT,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    due_date DATE,
-    status ENUM('pending', 'achieved') DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_milestones_project_status_due (project_id, status, due_date),
-    FOREIGN KEY (project_id) REFERENCES projects(id)
-);
+SET FOREIGN_KEY_CHECKS = 1;
 
--- Teams table
-CREATE TABLE teams (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Team members (many-to-many)
-CREATE TABLE team_members (
-    team_id INT,
-    user_id INT,
-    PRIMARY KEY (team_id, user_id),
-    KEY idx_team_members_user (user_id),
-    FOREIGN KEY (team_id) REFERENCES teams(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- Time logs for resource utilization
-CREATE TABLE time_logs (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    task_id INT,
-    hours DECIMAL(5,2),
-    log_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_time_logs_user_date (user_id, log_date),
-    KEY idx_time_logs_task_date (task_id, log_date),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (task_id) REFERENCES tasks(id)
-);
-
--- Task comments
-CREATE TABLE task_comments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    task_id INT,
-    user_id INT,
-    comment TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_task_comments_task_created (task_id, created_at),
-    KEY idx_task_comments_user (user_id),
-    FOREIGN KEY (task_id) REFERENCES tasks(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- Dashboard links managed from DB
-CREATE TABLE project_links (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    project_id INT NULL,
-    title VARCHAR(100) NOT NULL,
-    url VARCHAR(500) NOT NULL,
-    type ENUM('api_docs', 'brd', 'repository', 'staging', 'other') DEFAULT 'other',
-    sort_order INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_project_links_project_type (project_id, type),
-    KEY idx_project_links_sort_order (sort_order),
-    FOREIGN KEY (project_id) REFERENCES projects(id)
-);
-
--- Risk register managed from DB
-CREATE TABLE risks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    project_id INT NOT NULL,
-    title VARCHAR(120) NOT NULL,
-    description TEXT,
-    probability ENUM('low', 'medium', 'high') DEFAULT 'medium',
-    impact ENUM('low', 'medium', 'high') DEFAULT 'medium',
-    mitigation TEXT,
-    status ENUM('open', 'mitigating', 'resolved') DEFAULT 'open',
-    owner_id INT NULL,
-    due_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_risks_project_status_impact (project_id, status, impact),
-    KEY idx_risks_owner_due (owner_id, due_date),
-    FOREIGN KEY (project_id) REFERENCES projects(id),
-    FOREIGN KEY (owner_id) REFERENCES users(id)
-);
-
--- Task dependencies for dynamic dependency board
-CREATE TABLE task_dependencies (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    task_id INT NOT NULL,
-    depends_on_task_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_task_dependency (task_id, depends_on_task_id),
-    KEY idx_task_dependencies_depends_on (depends_on_task_id),
-    FOREIGN KEY (task_id) REFERENCES tasks(id),
-    FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id)
-);
-
--- Project file repository metadata
-CREATE TABLE project_files (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    project_id INT NOT NULL,
-    title VARCHAR(120) NOT NULL,
-    file_url VARCHAR(500) NOT NULL,
-    file_type VARCHAR(50) DEFAULT 'dokumen',
-    uploaded_by INT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_project_files_project_type (project_id, file_type),
-    KEY idx_project_files_uploaded_by (uploaded_by),
-    FOREIGN KEY (project_id) REFERENCES projects(id),
-    FOREIGN KEY (uploaded_by) REFERENCES users(id)
-);
-
--- Rich demo data. All demo users use password: adminfairy
+-- All demo users use password: adminfairy
 INSERT INTO users (username, password, email, role) VALUES
 ('adminfairy', '$2b$10$vKhSix7oUCrsYvtHkG4YCeyA/BQn0vpqsx98/QmAP/7DvtUN9zJqq', 'admin@example.com', 'pm'),
 ('pm-arya', '$2b$10$vKhSix7oUCrsYvtHkG4YCeyA/BQn0vpqsx98/QmAP/7DvtUN9zJqq', 'arya.pm@example.com', 'pm'),
@@ -237,7 +100,7 @@ SELECT
     WHEN tt.seq <= 6 THEN 'done'
     WHEN tt.seq <= 9 THEN 'in_progress'
     ELSE 'todo'
-  END,
+  END AS status,
   CASE
     WHEN p.status = 'completed' THEN 100
     WHEN p.status = 'planning' AND tt.seq = 1 THEN 100
@@ -261,8 +124,8 @@ SELECT
     WHEN tt.seq = 8 THEN 58
     WHEN tt.seq = 9 THEN 36
     ELSE 10
-  END,
-  DATE_ADD(p.start_date, INTERVAL tt.day_offset DAY)
+  END AS progress,
+  DATE_ADD(p.start_date, INTERVAL tt.day_offset DAY) AS due_date
 FROM projects p
 JOIN (
   SELECT 1 AS seq, 'Kickoff dan alignment stakeholder' AS name, 'Menetapkan scope awal, PIC, timeline, dan ritme komunikasi proyek.' AS description, 4 AS assigned_to, 7 AS day_offset
@@ -279,7 +142,11 @@ JOIN (
 ORDER BY p.id, tt.seq;
 
 INSERT INTO milestones (project_id, name, description, due_date, status)
-SELECT p.id, ms.name, ms.description, DATE_ADD(p.start_date, INTERVAL ms.day_offset DAY),
+SELECT
+  p.id,
+  ms.name,
+  ms.description,
+  DATE_ADD(p.start_date, INTERVAL ms.day_offset DAY),
   CASE
     WHEN p.status = 'completed' THEN 'achieved'
     WHEN p.status = 'planning' THEN 'pending'
@@ -306,7 +173,13 @@ UNION ALL SELECT id, CONCAT('Staging - ', name), CONCAT('https://staging.example
 UNION ALL SELECT id, CONCAT('Notulen Steering - ', name), CONCAT('https://example.com/projects/', id, '/minutes'), 'other', 5 FROM projects;
 
 INSERT INTO risks (project_id, title, description, probability, impact, mitigation, status, owner_id, due_date)
-SELECT p.id, rt.title, rt.description, rt.probability, rt.impact, rt.mitigation,
+SELECT
+  p.id,
+  rt.title,
+  rt.description,
+  rt.probability,
+  rt.impact,
+  rt.mitigation,
   CASE
     WHEN p.status = 'completed' THEN 'resolved'
     WHEN p.status IN ('at_risk', 'delayed') AND rt.seq IN (1, 2) THEN 'mitigating'
@@ -346,7 +219,11 @@ UNION ALL SELECT id, CONCAT('Laporan Sprint Terakhir - ', name), CONCAT('https:/
 UNION ALL SELECT id, CONCAT('Dokumen Handover - ', name), CONCAT('https://example.com/files/project-', id, '/handover.pdf'), 'handover', pm_id FROM projects;
 
 INSERT INTO time_logs (user_id, task_id, hours, log_date)
-SELECT t.assigned_to, t.id, ROUND(2.00 + (((t.id + n.n) MOD 6) * 0.75), 2), DATE_SUB(t.due_date, INTERVAL (6 - n.n) DAY)
+SELECT
+  t.assigned_to,
+  t.id,
+  ROUND(2.00 + (((t.id + n.n) MOD 6) * 0.75), 2),
+  DATE_SUB(t.due_date, INTERVAL (6 - n.n) DAY)
 FROM tasks t
 JOIN (
   SELECT 1 AS n
@@ -357,13 +234,22 @@ JOIN (
 WHERE n.n <= CASE WHEN t.status = 'done' THEN 4 WHEN t.status = 'in_progress' THEN 3 ELSE 1 END;
 
 INSERT INTO task_comments (task_id, user_id, comment)
-SELECT t.id, p.pm_id, CONCAT('Update PM: progres ', t.name, ' pada ', p.name, ' sudah direview untuk laporan mingguan.')
+SELECT
+  t.id,
+  p.pm_id,
+  CONCAT('Update PM: progres ', t.name, ' pada ', p.name, ' sudah direview untuk laporan mingguan.')
 FROM tasks t
 JOIN projects p ON t.project_id = p.id
 UNION ALL
-SELECT t.id, t.assigned_to, CONCAT('Catatan developer: ', t.name, ' memiliki status ', t.status, ' dengan progress ', t.progress, '%.')
+SELECT
+  t.id,
+  t.assigned_to,
+  CONCAT('Catatan developer: ', t.name, ' memiliki status ', t.status, ' dengan progress ', t.progress, '%.')
 FROM tasks t
 UNION ALL
-SELECT t.id, 7, CONCAT('QA note: skenario pengujian untuk ', t.name, ' sudah masuk checklist regresi.')
+SELECT
+  t.id,
+  7,
+  CONCAT('QA note: skenario pengujian untuk ', t.name, ' sudah masuk checklist regresi.')
 FROM tasks t
 WHERE t.status IN ('done', 'in_progress');

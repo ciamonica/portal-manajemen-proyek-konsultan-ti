@@ -113,3 +113,49 @@ CREATE TABLE IF NOT EXISTS task_comments (
   FOREIGN KEY (task_id) REFERENCES tasks(id),
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+DROP PROCEDURE IF EXISTS add_index_if_missing;
+DELIMITER //
+CREATE PROCEDURE add_index_if_missing(
+  IN p_table_name VARCHAR(64),
+  IN p_index_name VARCHAR(64),
+  IN p_index_sql TEXT
+)
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = p_table_name
+      AND INDEX_NAME = p_index_name
+  ) THEN
+    SET @index_sql = p_index_sql;
+    PREPARE index_stmt FROM @index_sql;
+    EXECUTE index_stmt;
+    DEALLOCATE PREPARE index_stmt;
+  END IF;
+END//
+DELIMITER ;
+
+CALL add_index_if_missing('users', 'idx_users_role', 'CREATE INDEX idx_users_role ON users (role)');
+CALL add_index_if_missing('projects', 'idx_projects_pm_status', 'CREATE INDEX idx_projects_pm_status ON projects (pm_id, status)');
+CALL add_index_if_missing('projects', 'idx_projects_client_status', 'CREATE INDEX idx_projects_client_status ON projects (client_id, status)');
+CALL add_index_if_missing('projects', 'idx_projects_dates', 'CREATE INDEX idx_projects_dates ON projects (start_date, end_date)');
+CALL add_index_if_missing('tasks', 'idx_tasks_project_status', 'CREATE INDEX idx_tasks_project_status ON tasks (project_id, status)');
+CALL add_index_if_missing('tasks', 'idx_tasks_assignee_status', 'CREATE INDEX idx_tasks_assignee_status ON tasks (assigned_to, status)');
+CALL add_index_if_missing('tasks', 'idx_tasks_due_date', 'CREATE INDEX idx_tasks_due_date ON tasks (due_date)');
+CALL add_index_if_missing('milestones', 'idx_milestones_project_status_due', 'CREATE INDEX idx_milestones_project_status_due ON milestones (project_id, status, due_date)');
+CALL add_index_if_missing('team_members', 'idx_team_members_user', 'CREATE INDEX idx_team_members_user ON team_members (user_id)');
+CALL add_index_if_missing('project_links', 'idx_project_links_project_type', 'CREATE INDEX idx_project_links_project_type ON project_links (project_id, type)');
+CALL add_index_if_missing('project_links', 'idx_project_links_sort_order', 'CREATE INDEX idx_project_links_sort_order ON project_links (sort_order)');
+CALL add_index_if_missing('risks', 'idx_risks_project_status_impact', 'CREATE INDEX idx_risks_project_status_impact ON risks (project_id, status, impact)');
+CALL add_index_if_missing('risks', 'idx_risks_owner_due', 'CREATE INDEX idx_risks_owner_due ON risks (owner_id, due_date)');
+CALL add_index_if_missing('task_dependencies', 'idx_task_dependencies_depends_on', 'CREATE INDEX idx_task_dependencies_depends_on ON task_dependencies (depends_on_task_id)');
+CALL add_index_if_missing('time_logs', 'idx_time_logs_user_date', 'CREATE INDEX idx_time_logs_user_date ON time_logs (user_id, log_date)');
+CALL add_index_if_missing('time_logs', 'idx_time_logs_task_date', 'CREATE INDEX idx_time_logs_task_date ON time_logs (task_id, log_date)');
+CALL add_index_if_missing('project_files', 'idx_project_files_project_type', 'CREATE INDEX idx_project_files_project_type ON project_files (project_id, file_type)');
+CALL add_index_if_missing('project_files', 'idx_project_files_uploaded_by', 'CREATE INDEX idx_project_files_uploaded_by ON project_files (uploaded_by)');
+CALL add_index_if_missing('task_comments', 'idx_task_comments_task_created', 'CREATE INDEX idx_task_comments_task_created ON task_comments (task_id, created_at)');
+CALL add_index_if_missing('task_comments', 'idx_task_comments_user', 'CREATE INDEX idx_task_comments_user ON task_comments (user_id)');
+
+DROP PROCEDURE IF EXISTS add_index_if_missing;
