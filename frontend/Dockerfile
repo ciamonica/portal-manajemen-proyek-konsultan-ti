@@ -1,3 +1,8 @@
+# ========================================================
+# KATEGORI      : Docker Configuration (Frontend)
+# DESKRIPSI     : File definisi kontainer untuk layanan frontend menggunakan multi-stage build.
+# ========================================================
+
 FROM node:20-alpine AS build
 
 WORKDIR /app

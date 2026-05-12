@@ -1,22 +1,43 @@
+/**
+ * ========================================================
+ * KATEGORI      : API Route (File Proyek)
+ * DESKRIPSI     : File routing untuk pengelolaan lampiran file atau dokumen.
+ * FUNGSI UTAMA  : Menyediakan endpoint CRUD untuk mereferensikan file terkait proyek.
+ * ========================================================
+ */
+
+// Mengimpor express
 const express = require('express');
+// Mengimpor koneksi pool DB
 const pool = require('../db');
+// Mengimpor skema validasi Zod
 const { projectFileSchema, parseSchema } = require('../validators/schemas');
+// Mengimpor middleware otorisasi
 const { authorizeRoles } = require('../middleware/auth');
 
 const router = express.Router();
 
+/**
+ * FUNGSI BANTUAN: roleFilter
+ * Membatasi akses file berdasarkan peran pengguna.
+ */
 function roleFilter(user) {
-  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] };
-  if (user.role === 'client') return { clause: 'p.client_id = ?', params: [user.id] };
+  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] }; // PM melihat file proyeknya
+  if (user.role === 'client') return { clause: 'p.client_id = ?', params: [user.id] }; // Client melihat file proyeknya
+  // Dev hanya melihat file dari proyek di mana dia memiliki task
   return {
     clause: 'EXISTS (SELECT 1 FROM tasks t WHERE t.project_id = pf.project_id AND t.assigned_to = ?)',
     params: [user.id]
   };
 }
 
+/**
+ * ENDPOINT: GET /api/project-files
+ * Mendapatkan daftar file yang dilampirkan pada suatu proyek.
+ */
 router.get('/', async (req, res, next) => {
   try {
-    const filter = roleFilter(req.user);
+    const filter = roleFilter(req.user); // Filter berdasarkan role
     const [rows] = await pool.query(
       `
         SELECT pf.*, p.name AS project_name, u.username AS uploaded_by_username
@@ -28,23 +49,31 @@ router.get('/', async (req, res, next) => {
       `,
       filter.params
     );
-    res.json({ success: true, data: rows });
+    res.json({ success: true, data: rows }); // Kembalikan data
   } catch (err) {
     next(err);
   }
 });
 
+/**
+ * ENDPOINT: POST /api/project-files
+ * Menambahkan rujukan file baru ke proyek. Hanya PM yang berhak mengupload.
+ */
 router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   try {
+    // Validasi input data
     const { data, error } = parseSchema(projectFileSchema, req.body);
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
 
+    // Melakukan operasi Insert ke database
     const [result] = await pool.query(
       'INSERT INTO project_files (project_id, title, file_url, file_type, uploaded_by) VALUES (?, ?, ?, ?, ?)',
       [data.project_id, data.title, data.file_url, data.file_type || 'dokumen', req.user.id]
     );
+    
+    // Ambil data file baru yang diinsert
     const [rows] = await pool.query('SELECT * FROM project_files WHERE id = ?', [result.insertId]);
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
@@ -52,9 +81,14 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   }
 });
 
+/**
+ * ENDPOINT: PUT /api/project-files/:id
+ * Mengupdate referensi file yang sudah ada (Hanya PM).
+ */
 router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const fileId = Number(req.params.id);
+    // Validasi input parsial
     const { data, error } = parseSchema(projectFileSchema.partial(), req.body);
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
@@ -62,6 +96,7 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 
     const updates = [];
     const params = [];
+    // Bangun kueri update dinamis
     Object.entries(data).forEach(([key, value]) => {
       updates.push(`${key} = ?`);
       params.push(value);
@@ -71,7 +106,10 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
     }
 
     params.push(fileId);
+    // Eksekusi pembaruan ke dalam tabel
     await pool.query(`UPDATE project_files SET ${updates.join(', ')} WHERE id = ?`, params);
+    
+    // Kembalikan objek data hasil update
     const [rows] = await pool.query('SELECT * FROM project_files WHERE id = ?', [fileId]);
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -79,10 +117,16 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
   }
 });
 
+/**
+ * ENDPOINT: DELETE /api/project-files/:id
+ * Menghapus file proyek dari database.
+ */
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const fileId = Number(req.params.id);
+    // Eksekusi query penghapusan
     await pool.query('DELETE FROM project_files WHERE id = ?', [fileId]);
+    // Konfirmasi respons OK
     res.json({ success: true, data: { id: fileId } });
   } catch (err) {
     next(err);

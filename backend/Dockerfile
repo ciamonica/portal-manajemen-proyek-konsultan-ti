@@ -1,3 +1,8 @@
+# ========================================================
+# KATEGORI      : Docker Configuration (Backend)
+# DESKRIPSI     : File definisi kontainer untuk layanan backend.
+# ========================================================
+
 FROM node:20-alpine
 
 WORKDIR /app

@@ -1,19 +1,39 @@
+/**
+ * ========================================================
+ * KATEGORI      : API Route (Pencatatan Waktu / Time Logs)
+ * DESKRIPSI     : File routing untuk pengelolaan log waktu pekerja.
+ * FUNGSI UTAMA  : Menyediakan endpoint CRUD untuk mencatat jam kerja (time logs) pada suatu tugas.
+ * ========================================================
+ */
+
+// Mengimpor library express
 const express = require('express');
+// Mengimpor koneksi database
 const pool = require('../db');
+// Mengimpor skema validasi
 const { timeLogSchema, parseSchema } = require('../validators/schemas');
+// Mengimpor middleware otorisasi
 const { authorizeRoles } = require('../middleware/auth');
 
 const router = express.Router();
 
+/**
+ * FUNGSI BANTUAN: roleFilter
+ * Menghasilkan filter SQL untuk membatasi hak akses berdasarkan peran.
+ */
 function roleFilter(user) {
-  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] };
-  if (user.role === 'client') return { clause: 'p.client_id = ?', params: [user.id] };
-  return { clause: 'tl.user_id = ?', params: [user.id] };
+  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] }; // PM melihat log dari proyek yang dipegangnya
+  if (user.role === 'client') return { clause: 'p.client_id = ?', params: [user.id] }; // Client melihat log proyek miliknya
+  return { clause: 'tl.user_id = ?', params: [user.id] }; // Dev hanya melihat log waktunya sendiri
 }
 
+/**
+ * ENDPOINT: GET /api/time-logs
+ * Mengambil daftar log waktu berdasarkan filter otorisasi.
+ */
 router.get('/', async (req, res, next) => {
   try {
-    const filter = roleFilter(req.user);
+    const filter = roleFilter(req.user); // Dapatkan filter
     const [rows] = await pool.query(
       `
         SELECT tl.*, u.username, t.name AS task_name, p.id AS project_id, p.name AS project_name
@@ -26,24 +46,34 @@ router.get('/', async (req, res, next) => {
       `,
       filter.params
     );
-    res.json({ success: true, data: rows });
+    res.json({ success: true, data: rows }); // Kembalikan respons
   } catch (err) {
     next(err);
   }
 });
 
+/**
+ * ENDPOINT: POST /api/time-logs
+ * Mencatat jam kerja baru. Dev bisa mencatat waktunya, PM bisa mencatat untuk orang lain atau dirinya.
+ */
 router.post('/', authorizeRoles('pm', 'dev'), async (req, res, next) => {
   try {
+    // Validasi input
     const { data, error } = parseSchema(timeLogSchema, req.body);
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
 
+    // Tentukan ID pengguna yang log-nya dicatat
     const userId = req.user.role === 'pm' ? (data.user_id || req.user.id) : req.user.id;
+    
+    // Insert data ke database
     const [result] = await pool.query(
       'INSERT INTO time_logs (user_id, task_id, hours, log_date) VALUES (?, ?, ?, ?)',
       [userId, data.task_id, data.hours, data.log_date || new Date().toISOString().slice(0, 10)]
     );
+    
+    // Mengembalikan data hasil insert
     const [rows] = await pool.query('SELECT * FROM time_logs WHERE id = ?', [result.insertId]);
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
@@ -51,9 +81,14 @@ router.post('/', authorizeRoles('pm', 'dev'), async (req, res, next) => {
   }
 });
 
+/**
+ * ENDPOINT: PUT /api/time-logs/:id
+ * Mengupdate catatan waktu tertentu.
+ */
 router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
   try {
     const timeLogId = Number(req.params.id);
+    // Validasi input parsial
     const { data, error } = parseSchema(timeLogSchema.partial(), req.body);
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
@@ -61,7 +96,9 @@ router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
 
     const updates = [];
     const params = [];
+    // Siapkan data yang akan diupdate
     Object.entries(data).forEach(([key, value]) => {
+      // Abaikan jika undefiend. Dev tidak bisa ganti user_id
       if (value === undefined || (req.user.role !== 'pm' && key === 'user_id')) return;
       updates.push(`${key} = ?`);
       params.push(value);
@@ -73,6 +110,8 @@ router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
 
     params.push(timeLogId);
     let query = `UPDATE time_logs SET ${updates.join(', ')} WHERE id = ?`;
+    
+    // Jika role = dev, pastikan dia hanya bisa update log miliknya
     if (req.user.role === 'dev') {
       query += ' AND user_id = ?';
       params.push(req.user.id);
@@ -83,6 +122,7 @@ router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Time log not found' });
     }
 
+    // Ambil data terbaru
     const [rows] = await pool.query('SELECT * FROM time_logs WHERE id = ?', [timeLogId]);
     res.json({ success: true, data: rows[0] });
   } catch (err) {
@@ -90,15 +130,22 @@ router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
   }
 });
 
+/**
+ * ENDPOINT: DELETE /api/time-logs/:id
+ * Menghapus data log waktu. Dev hanya bisa hapus miliknya sendiri.
+ */
 router.delete('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
   try {
     const timeLogId = Number(req.params.id);
     const params = [timeLogId];
     let query = 'DELETE FROM time_logs WHERE id = ?';
+    
+    // Batasan akses untuk dev
     if (req.user.role === 'dev') {
       query += ' AND user_id = ?';
       params.push(req.user.id);
     }
+    
     await pool.query(query, params);
     res.json({ success: true, data: { id: timeLogId } });
   } catch (err) {

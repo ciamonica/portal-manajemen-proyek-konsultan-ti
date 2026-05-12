@@ -1,3 +1,11 @@
+/**
+ * ========================================================
+ * KATEGORI      : Pengujian (Backend)
+ * DESKRIPSI     : File berisi unit testing untuk autentikasi dan RBAC.
+ * FUNGSI UTAMA  : Memastikan login, otorisasi peran, dan isolasi akses data berfungsi benar.
+ * ========================================================
+ */
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const bcrypt = require('bcrypt');

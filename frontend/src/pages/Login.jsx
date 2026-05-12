@@ -1,3 +1,11 @@
+/**
+ * ========================================================
+ * KATEGORI      : Halaman Aplikasi (Frontend)
+ * DESKRIPSI     : Halaman antarmuka untuk masuk (login) ke dalam sistem.
+ * FUNGSI UTAMA  : Menampilkan form login, memproses kredensial, dan menangani error otentikasi.
+ * ========================================================
+ */
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -6,20 +14,30 @@ const APP_NAME = 'Portal Manajemen';
 const FULL_APP_NAME = 'Proyek Konsultan TI';
 
 export default function Login() {
+  // State untuk menyimpan input form dan pesan error
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  
+  // Mengambil fungsi login dari context otentikasi
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  /**
+   * FUNGSI: handleSubmit
+   * Menangani event submit form login.
+   */
   const handleSubmit = async (event) => {
-    event.preventDefault();
-    setError('');
+    event.preventDefault(); // Mencegah reload halaman standar
+    setError(''); // Kosongkan pesan error sebelumnya
 
     try {
+      // Memanggil fungsi login dari AuthContext
       await login({ username, password });
+      // Jika berhasil, arahkan kembali ke beranda
       navigate('/');
     } catch (err) {
+      // Jika gagal, tampilkan pesan error
       setError(err.message);
     }
   };
@@ -27,6 +45,7 @@ export default function Login() {
   return (
     <div className="auth-page">
       <main className="auth-layout" aria-labelledby="login-title">
+        {/* Panel informasi sebelah kiri (biasanya) */}
         <section className="auth-info-panel" aria-label="Informasi portal">
           <p className="auth-eyebrow">Sistem Informasi</p>
           <h1 id="login-title">{APP_NAME}</h1>
@@ -52,6 +71,7 @@ export default function Login() {
           </div>
         </section>
 
+        {/* Panel Form Login sebelah kanan (biasanya) */}
         <section className="auth-card" aria-label="Form login">
           <header className="auth-header">
             <p className="auth-eyebrow">Login</p>
@@ -81,6 +101,7 @@ export default function Login() {
                 required
               />
             </label>
+            {/* Menampilkan pesan error jika otentikasi gagal */}
             {error && <p className="form-error" role="alert">{error}</p>}
             <button className="auth-submit" type="submit">Masuk</button>
           </form>

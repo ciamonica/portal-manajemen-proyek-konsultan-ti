@@ -1,3 +1,9 @@
+-- ========================================================
+-- KATEGORI      : Database Schema & Seed (Root)
+-- DESKRIPSI     : Script lengkap inisialisasi struktur tabel dan data demo.
+-- FUNGSI UTAMA  : Mengatur ulang database untuk keperluan pengujian / demo.
+-- ========================================================
+
 -- Database Schema for Portal Manajemen Proyek Konsultan TI
 -- Import this file into XAMPP MySQL
 

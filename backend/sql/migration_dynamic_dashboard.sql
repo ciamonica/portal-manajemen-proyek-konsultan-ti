@@ -1,3 +1,9 @@
+-- ========================================================
+-- KATEGORI      : Database Migration (Backend)
+-- DESKRIPSI     : Script migrasi database untuk pembaruan skema.
+-- FUNGSI UTAMA  : Memperbarui kolom, indeks, dan struktur tabel secara dinamis.
+-- ========================================================
+
 USE project_portal;
 
 ALTER TABLE projects

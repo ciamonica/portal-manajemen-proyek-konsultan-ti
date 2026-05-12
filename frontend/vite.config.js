@@ -1,3 +1,11 @@
+/**
+ * ========================================================
+ * KATEGORI      : Konfigurasi (Frontend)
+ * DESKRIPSI     : File konfigurasi untuk Vite bundler.
+ * FUNGSI UTAMA  : Mengatur plugin React, port server dev, dan proxy API ke backend.
+ * ========================================================
+ */
+
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 

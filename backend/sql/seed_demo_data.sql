@@ -1,6 +1,12 @@
 -- Rich demo data for Portal Manajemen Proyek Konsultan TI
 -- Run this after schema creation to replace old sample data.
 
+-- ========================================================
+-- KATEGORI      : Database Seed (Backend)
+-- DESKRIPSI     : Script untuk memasukkan data awal/contoh (demo).
+-- FUNGSI UTAMA  : Mengisi tabel dengan data dummy seperti users, projects, tasks, dll.
+-- ========================================================
+
 USE project_portal;
 
 SET FOREIGN_KEY_CHECKS = 0;

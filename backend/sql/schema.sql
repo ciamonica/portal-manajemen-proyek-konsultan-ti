@@ -1,3 +1,9 @@
+-- ========================================================
+-- KATEGORI      : Database Schema (Backend)
+-- DESKRIPSI     : Script inisialisasi struktur tabel database.
+-- FUNGSI UTAMA  : Membuat database, tabel, dan constraint foreign key.
+-- ========================================================
+
 -- Backend schema for project portal
 -- Use MySQL and import into database named project_portal
 

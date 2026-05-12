@@ -1,3 +1,11 @@
+/**
+ * ========================================================
+ * KATEGORI      : Halaman Aplikasi (Frontend)
+ * DESKRIPSI     : Halaman Dashboard utama untuk menampilkan ringkasan data, statistik, dan manajemen entitas (CRUD).
+ * FUNGSI UTAMA  : Menampilkan visualisasi data (Chart.js), mengelola state aplikasi, dan memanggil API untuk berbagai entitas.
+ * ========================================================
+ */
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient } from '../api/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
