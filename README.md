@@ -42,7 +42,7 @@ Aplikasi ini sekarang mendukung stack modern dengan backend Node.js/Express, fro
 - `PUT /api/projects/:id` (PM)
 - `DELETE /api/projects/:id` (PM)
 - `GET /api/tasks`
-- `POST /api/tasks` (PM, DEV)
+- `POST /api/tasks` (PM)
 - `PUT /api/tasks/:id` (PM, DEV)
 - `DELETE /api/tasks/:id` (PM)
 - `GET /api/users` (PM)

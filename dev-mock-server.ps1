@@ -218,6 +218,26 @@ function Get-Username {
     return $null
 }
 
+function ConvertTo-TeamMembers {
+    param($MemberIds)
+
+    if (-not $MemberIds) {
+        return @()
+    }
+
+    return @($MemberIds | ForEach-Object {
+        $memberId = [int]$_
+        $matchedUser = $users | Where-Object { $_.id -eq $memberId } | Select-Object -First 1
+        if ($matchedUser) {
+            [ordered]@{
+                id = $matchedUser.id
+                username = $matchedUser.username
+                role = $matchedUser.role
+            }
+        }
+    })
+}
+
 function Get-TaskName {
     param($TaskId)
 
@@ -390,6 +410,11 @@ function Handle-Api {
     }
 
     if ($path -eq '/api/tasks' -and $method -eq 'POST') {
+        if ($currentUser.role -ne 'pm') {
+            Send-Json $Context @{ success = $false; error = 'Forbidden' } 403
+            return
+        }
+
         $body = Read-JsonBody $Context
         $item = [ordered]@{
             id = Get-NextId $tasks
@@ -478,7 +503,7 @@ function Handle-Api {
             id = Get-NextId $teams
             name = $body.name
             created_at = (Get-Date).ToString('s')
-            members = @()
+            members = ConvertTo-TeamMembers $body.member_ids
         }
         $script:teams = @($teams + $item)
         Send-Json $Context @{ success = $true; data = $item } 201
@@ -499,7 +524,12 @@ function Handle-Api {
             Send-Json $Context @{ success = $false; error = 'Team not found' } 404
             return
         }
-        Send-Json $Context @{ success = $true; data = Merge-Item $item $body }
+        Merge-Item $item $body | Out-Null
+        if ($body.PSObject.Properties.Name -contains 'member_ids') {
+            $item.members = ConvertTo-TeamMembers $body.member_ids
+            $item.Remove('member_ids')
+        }
+        Send-Json $Context @{ success = $true; data = $item }
         return
     }
 

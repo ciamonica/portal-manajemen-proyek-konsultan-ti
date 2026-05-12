@@ -53,7 +53,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.post('/', authorizeRoles('pm', 'dev'), async (req, res, next) => {
+router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const { data, error } = parseSchema(taskCreateSchema, req.body);
     if (error) {

@@ -168,6 +168,11 @@ function projectImage(project) {
   return project?.cover_image_url || generatedProjectImage(project);
 }
 
+function teamMemberNames(team) {
+  if (!team?.members?.length) return 'Belum ada anggota';
+  return team.members.map((member) => member.username).join(', ');
+}
+
 function milestonePercent(milestone, tasks) {
   if (milestone.status === 'achieved') return 100;
   const relatedTasks = tasks.filter((task) => Number(task.project_id) === Number(milestone.project_id));
@@ -200,6 +205,62 @@ function buildBurnDownData(tasks) {
       return Math.max(0, totalWork - completedWork);
     })
   };
+}
+
+function startOfLocalDay(value = new Date()) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  const date = new Date(value);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function buildDelayRiskItems(tasks) {
+  const today = startOfLocalDay();
+  return tasks
+    .map((task) => {
+      const dueInput = toDateInput(task.due_date);
+      if (!dueInput || task.status === 'done') return null;
+
+      const dueDate = startOfLocalDay(dueInput);
+      const daysLeft = Math.ceil((dueDate - today) / 86400000);
+      const progress = clampPercent(task.progress || 0);
+
+      if (daysLeft < 0) {
+        return {
+          ...task,
+          daysLeft,
+          severity: 'high',
+          label: `Terlambat ${Math.abs(daysLeft)} hari`
+        };
+      }
+
+      if (daysLeft <= 7) {
+        return {
+          ...task,
+          daysLeft,
+          severity: 'medium',
+          label: daysLeft === 0 ? 'Jatuh tempo hari ini' : `Jatuh tempo ${daysLeft} hari lagi`
+        };
+      }
+
+      if (daysLeft <= 14 && progress < 50) {
+        return {
+          ...task,
+          daysLeft,
+          severity: 'medium',
+          label: `Progres rendah, ${daysLeft} hari lagi`
+        };
+      }
+
+      return null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const severityOrder = { high: 0, medium: 1 };
+      return severityOrder[a.severity] - severityOrder[b.severity] || a.daysLeft - b.daysLeft;
+    });
 }
 
 function dashboardStats(tasks = [], projects = []) {
@@ -241,7 +302,7 @@ export default function Dashboard() {
   const [dependencyForm, setDependencyForm] = useState({ task_id: '', depends_on_task_id: '' });
   const [fileForm, setFileForm] = useState({ project_id: '', title: '', file_url: '', file_type: 'dokumen' });
   const [commentForm, setCommentForm] = useState({ task_id: '', comment: '' });
-  const [activeDataForm, setActiveDataForm] = useState(user.role === 'pm' ? 'project' : user.role === 'dev' ? 'task' : 'comment');
+  const [activeDataForm, setActiveDataForm] = useState(user.role === 'pm' ? 'project' : user.role === 'dev' ? 'timeLog' : 'comment');
   const [editingProject, setEditingProject] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
   const [editingMilestone, setEditingMilestone] = useState(null);
@@ -358,6 +419,7 @@ export default function Dashboard() {
     })), [filteredTasks]);
 
   const burnDownData = useMemo(() => buildBurnDownData(filteredTasks), [filteredTasks]);
+  const automaticDelayRisks = useMemo(() => buildDelayRiskItems(tasks), [tasks]);
 
   const resourceUtilization = useMemo(() => {
     const totals = new Map();
@@ -385,7 +447,7 @@ export default function Dashboard() {
 
   const dataFormTabs = [
     { key: 'project', label: 'Proyek', visible: user.role === 'pm' },
-    { key: 'task', label: 'Tugas', visible: user.role === 'pm' || user.role === 'dev' },
+    { key: 'task', label: 'Tugas', visible: user.role === 'pm' },
     { key: 'milestone', label: 'Milestone', visible: user.role === 'pm' },
     { key: 'team', label: 'Tim', visible: user.role === 'pm' },
     { key: 'link', label: 'Link', visible: user.role === 'pm' },
@@ -606,6 +668,13 @@ export default function Dashboard() {
       name: team.name || '',
       member_ids: team.members ? team.members.map((member) => String(member.id)) : []
     });
+    focusDataManagement();
+  };
+
+  const handleTeamCreateOpen = () => {
+    setActiveDataForm('team');
+    setEditingTeam(null);
+    setTeamForm({ name: '', member_ids: [] });
     focusDataManagement();
   };
 
@@ -1092,16 +1161,9 @@ export default function Dashboard() {
   }, [statusCounts, projectStatus, burnDownData]);
   return (
     <div className="page dashboard-page">
-      <section className="welcome-panel">
+      <section id="dashboard-section" className="welcome-panel">
         <h2>Selamat datang, {user.username}</h2>
       </section>
-
-      <header className="page-header">
-        <div>
-          <h1>Dashboard</h1>
-          <p>Pantau progres proyek, tugas, dan aktivitas tim dalam satu tempat.</p>
-        </div>
-      </header>
 
       <section className="dashboard-intro">
         <article className="hero-card">
@@ -1181,12 +1243,60 @@ export default function Dashboard() {
         </article>
       </section>
 
-      <section className="task-management-section">
+      <section id="projects-section" className="project-overview-section">
+        <div className="project-overview-card">
+          <div className="section-action-header">
+            <div>
+              <h2>Proyek</h2>
+              <p>Ringkasan proyek konsultasi TI, status, Project Manager, dan client.</p>
+            </div>
+            {user.role === 'pm' && (
+              <button type="button" className="mini-action-button" onClick={handleProjectCreateOpen}>
+                Tambah Proyek
+              </button>
+            )}
+          </div>
+          {projects.length ? (
+            <div className="project-overview-grid">
+              {projects.map((project) => (
+                <article key={project.id} className="project-card">
+                  <img className="project-card-image" src={projectImage(project)} alt="" />
+                  <div className="project-card-header">
+                    <h3>{project.name}</h3>
+                    <span className={`status-pill status-${project.status || 'planning'}`}>
+                      {labelFrom(PROJECT_STATUS_LABELS, project.status || 'planning')}
+                    </span>
+                  </div>
+                  <p>{project.description || 'Belum ada deskripsi.'}</p>
+                  <div className="project-meta-grid">
+                    <span>
+                      <strong>PM</strong>
+                      {project.pm_username || '-'}
+                    </span>
+                    <span>
+                      <strong>Client</strong>
+                      {project.client_username || '-'}
+                    </span>
+                  </div>
+                  {user.role === 'pm' && (
+                    <div className="page-card-actions">
+                      <button type="button" onClick={() => handleProjectEdit(project)}>Edit</button>
+                      <button type="button" className="danger-button" onClick={() => handleProjectDelete(project.id)}>Hapus</button>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : <p className="empty-state">Belum ada proyek.</p>}
+        </div>
+      </section>
+
+      <section id="tasks-section" className="task-management-section">
         <div className="task-management-card">
           <div className="task-management-header">
             <div>
-              <h2>Manajemen Tugas & Milestone</h2>
-              <p>Pantau pekerjaan utama dan capaian proyek.</p>
+              <h2>Tugas</h2>
+              <p>Pantau pekerjaan utama, progres, tenggat, dan dependensi.</p>
             </div>
           </div>
 
@@ -1197,7 +1307,7 @@ export default function Dashboard() {
                   <h3>Kanban Board / Gantt Chart</h3>
                   <p>Prioritas kerja dan tenggat utama tim.</p>
                 </div>
-                {(user.role === 'pm' || user.role === 'dev') && (
+                {user.role === 'pm' && (
                   <button type="button" className="mini-action-button" onClick={handleTaskCreateOpen}>
                     Tambah
                   </button>
@@ -1209,7 +1319,7 @@ export default function Dashboard() {
                     <div className="gantt-row-main">
                       <span>{task.name}</span>
                     </div>
-                    {(user.role === 'pm' || user.role === 'dev') && (
+                    {user.role === 'pm' && (
                       <button type="button" className="text-action-button" onClick={() => handleTaskEdit(task)}>
                         Edit
                       </button>
@@ -1220,35 +1330,6 @@ export default function Dashboard() {
                   </div>
                 )) : <p className="empty-state">Belum ada tugas untuk ditampilkan.</p>}
               </div>
-            </article>
-
-            <article className="task-card">
-              <div className="section-action-header">
-                <div>
-                  <h3>Milestone</h3>
-                  <p>Capaian utama dan target penyelesaian proyek.</p>
-                </div>
-                {user.role === 'pm' && (
-                  <button type="button" className="mini-action-button" onClick={handleMilestoneCreateOpen}>
-                    Tambah
-                  </button>
-                )}
-              </div>
-              <ul className="milestone-list">
-                {milestoneProgress.length ? milestoneProgress.map((milestone) => (
-                  <li key={`${milestone.phase}-${milestone.project || ''}`} className="inline-action-row">
-                    <div>
-                      <strong>{milestone.phase}</strong> {milestone.project || ''}
-                      <span>{milestone.percent}% selesai</span>
-                    </div>
-                    {user.role === 'pm' && (
-                      <button type="button" className="text-action-button" onClick={() => handleMilestoneEdit(milestone)}>
-                        Edit
-                      </button>
-                    )}
-                  </li>
-                )) : <li className="empty-state">Belum ada milestone.</li>}
-              </ul>
             </article>
 
             <article className="task-card">
@@ -1283,76 +1364,151 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="monitoring-section">
-        <div className="monitoring-header">
-          <div>
-            <h2>Monitoring Progres & Performa</h2>
-            <p>Indikator jadwal, beban kerja, dan pencatatan waktu.</p>
+      <section id="milestones-section" className="milestone-team-section">
+        <div className="milestone-team-card">
+          <div className="section-action-header">
+            <div>
+              <h2>Milestone & Tim</h2>
+              <p>Capaian proyek dan susunan tim diletakkan berdekatan agar konteksnya mudah dibaca.</p>
+            </div>
+          </div>
+          <div className="milestone-team-grid">
+            <article className="task-card">
+              <div className="section-action-header">
+                <div>
+                  <h3>Milestone</h3>
+                  <p>Target penting dan status pencapaian setiap proyek.</p>
+                </div>
+                {user.role === 'pm' && (
+                  <button type="button" className="mini-action-button" onClick={handleMilestoneCreateOpen}>
+                    Tambah
+                  </button>
+                )}
+              </div>
+              <ul className="milestone-list">
+                {milestoneProgress.length ? milestoneProgress.map((milestone) => (
+                  <li key={`${milestone.phase}-${milestone.project || ''}`} className="inline-action-row">
+                    <div>
+                      <strong>{milestone.phase}</strong>
+                      <small>{milestone.project || '-'} - {labelFrom(MILESTONE_STATUS_LABELS, milestone.status)}</small>
+                      <span>{milestone.percent}% selesai</span>
+                    </div>
+                    {user.role === 'pm' && (
+                      <button type="button" className="text-action-button" onClick={() => handleMilestoneEdit(milestone)}>
+                        Edit
+                      </button>
+                    )}
+                  </li>
+                )) : <li className="empty-state">Belum ada milestone.</li>}
+              </ul>
+            </article>
+
+            <article id="teams-section" className="task-card team-overview-card">
+              <div className="section-action-header">
+                <div>
+                  <h3>Tim</h3>
+                  <p>Daftar tim dan anggota yang terlibat.</p>
+                </div>
+                {user.role === 'pm' && (
+                  <button type="button" className="mini-action-button" onClick={handleTeamCreateOpen}>
+                    Tambah
+                  </button>
+                )}
+              </div>
+              <div className="team-overview-list">
+                {teams.length ? teams.map((team) => (
+                  <div key={team.id} className="team-overview-item inline-action-row">
+                    <div>
+                      <strong>{team.name}</strong>
+                      <span>{teamMemberNames(team)}</span>
+                      <small>{team.members?.length || 0} anggota</small>
+                    </div>
+                    {user.role === 'pm' && (
+                      <button type="button" className="text-action-button" onClick={() => handleTeamEdit(team)}>
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                )) : <p className="empty-state">Belum ada tim.</p>}
+              </div>
+            </article>
           </div>
         </div>
-        <div className="monitoring-grid">
-          <article className="monitoring-card">
-            <h3>Burn-down Chart</h3>
-            <p>Perbandingan sisa pekerjaan dan waktu tersedia.</p>
-            <canvas id="burndownChart" />
-            <p className="monitoring-note">Pantau selisih aktual dan rencana.</p>
-          </article>
+      </section>
 
-          <article className="monitoring-card">
-            <h3>Resource Utilization</h3>
-            <p>Beban kerja tim dalam jam dan persentase utilisasi.</p>
-            <table className="utilization-table">
-              <thead>
-                <tr>
-                  <th>Nama</th>
-                  <th>Jam / Minggu</th>
-                  <th>Utilisasi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {resourceUtilization.length ? resourceUtilization.map((member) => (
-                  <tr key={member.name}>
-                    <td>{member.name}</td>
-                    <td>{member.hours}</td>
-                    <td>{member.utilization}</td>
-                  </tr>
-                )) : (
+      <section className="monitoring-section">
+        <div className="monitoring-panel">
+          <div className="monitoring-header">
+            <div>
+              <h2>Monitoring Progres & Performa</h2>
+              <p>Indikator jadwal, beban kerja, dan pencatatan waktu.</p>
+            </div>
+          </div>
+
+          <div className="monitoring-grid">
+            <article className="monitoring-card">
+              <h3>Burn-down Chart</h3>
+              <p>Perbandingan sisa pekerjaan dan waktu tersedia.</p>
+              <canvas id="burndownChart" />
+              <p className="monitoring-note">Pantau selisih aktual dan rencana.</p>
+            </article>
+
+            <article className="monitoring-card">
+              <h3>Resource Utilization</h3>
+              <p>Beban kerja tim dalam jam dan persentase utilisasi.</p>
+              <table className="utilization-table">
+                <thead>
                   <tr>
-                    <td colSpan="3">Belum ada log waktu.</td>
+                    <th>Nama</th>
+                    <th>Jam / Minggu</th>
+                    <th>Utilisasi</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </article>
-
-          <article className="monitoring-card">
-            <div className="section-action-header">
-              <div>
-                <h3>Time Tracking</h3>
-                <p>Catatan waktu pekerjaan per tanggal.</p>
-              </div>
-              {user.role !== 'client' && (
-                <button type="button" className="mini-action-button" onClick={handleTimeLogCreateOpen}>
-                  Tambah
-                </button>
-              )}
-            </div>
-            <div className="time-tracking-list">
-              {timeTrackingEntries.length ? timeTrackingEntries.map((entry) => (
-                <div key={entry.id || `${entry.task}-${entry.date}`} className="time-tracking-item inline-action-row">
-                  <div>
-                    <span>{entry.task}</span>
-                    <small>{entry.hours} jam - {entry.date}{entry.username ? ` - ${entry.username}` : ''}</small>
-                  </div>
-                  {user.role !== 'client' && (
-                    <button type="button" className="text-action-button" onClick={() => handleTimeLogEdit(entry)}>
-                      Edit
-                    </button>
+                </thead>
+                <tbody>
+                  {resourceUtilization.length ? resourceUtilization.map((member) => (
+                    <tr key={member.name}>
+                      <td>{member.name}</td>
+                      <td>{member.hours}</td>
+                      <td>{member.utilization}</td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan="3">Belum ada log waktu.</td>
+                    </tr>
                   )}
+                </tbody>
+              </table>
+            </article>
+
+            <article className="monitoring-card">
+              <div className="section-action-header">
+                <div>
+                  <h3>Time Tracking</h3>
+                  <p>Catatan waktu pekerjaan per tanggal.</p>
                 </div>
-              )) : <p className="empty-state">Belum ada log waktu.</p>}
-            </div>
-          </article>
+                {user.role !== 'client' && (
+                  <button type="button" className="mini-action-button" onClick={handleTimeLogCreateOpen}>
+                    Tambah
+                  </button>
+                )}
+              </div>
+              <div className="time-tracking-list">
+                {timeTrackingEntries.length ? timeTrackingEntries.map((entry) => (
+                  <div key={entry.id || `${entry.task}-${entry.date}`} className="time-tracking-item inline-action-row">
+                    <div>
+                      <span>{entry.task}</span>
+                      <small>{entry.hours} jam - {entry.date}{entry.username ? ` - ${entry.username}` : ''}</small>
+                    </div>
+                    {user.role !== 'client' && (
+                      <button type="button" className="text-action-button" onClick={() => handleTimeLogEdit(entry)}>
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                )) : <p className="empty-state">Belum ada log waktu.</p>}
+              </div>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -1368,6 +1524,23 @@ export default function Dashboard() {
                 Tambah Risiko
               </button>
             )}
+          </div>
+          <div className="delay-risk-panel">
+            <div>
+              <h3>Risiko Delay</h3>
+              <p>Task belum selesai yang melewati atau mendekati tenggat.</p>
+            </div>
+            <div className="delay-risk-list">
+              {automaticDelayRisks.length ? automaticDelayRisks.slice(0, 5).map((task) => (
+                <div key={task.id} className="delay-risk-item">
+                  <div>
+                    <strong>{task.name}</strong>
+                    <small>{task.project_name || '-'} - Tenggat {formatDate(task.due_date)}</small>
+                  </div>
+                  <span className={`delay-risk-badge delay-risk-${task.severity}`}>{task.label}</span>
+                </div>
+              )) : <p className="empty-state">Tidak ada task yang terdeteksi berisiko delay.</p>}
+            </div>
           </div>
           <table className="risk-table">
             <thead>

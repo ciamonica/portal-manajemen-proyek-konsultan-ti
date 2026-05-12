@@ -3,8 +3,6 @@ import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
-import Projects from './pages/Projects.jsx';
-import Tasks from './pages/Tasks.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 const APP_NAME = 'Portal Manajemen';
@@ -14,6 +12,8 @@ function getPageTitle(pathname) {
   if (pathname === '/login') return 'Login';
   if (pathname === '/projects') return 'Proyek';
   if (pathname === '/tasks') return 'Tugas';
+  if (pathname === '/milestones') return 'Milestone';
+  if (pathname === '/teams') return 'Tim';
   return 'Dashboard';
 }
 
@@ -25,6 +25,14 @@ function App() {
     document.title = `${APP_NAME} | ${getPageTitle(location.pathname)}`;
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (!location.hash) return;
+    const sectionId = decodeURIComponent(location.hash.slice(1));
+    window.requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [location.pathname, location.hash]);
+
   return (
     <div className="app-shell">
       {user && location.pathname !== '/login' && (
@@ -35,9 +43,10 @@ function App() {
             </Link>
             <div className="top-nav-actions">
               <div className="top-nav-links">
-                <Link to="/">Dashboard</Link>
-                <Link to="/projects">Proyek</Link>
-                <Link to="/tasks">Tugas</Link>
+                <Link to="/#projects-section">Proyek</Link>
+                <Link to="/#tasks-section">Tugas</Link>
+                <Link to="/#milestones-section">Milestone</Link>
+                <Link to="/#teams-section">Tim</Link>
               </div>
               <button className="outline-button" onClick={logout}>Logout</button>
             </div>
@@ -48,8 +57,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<ProtectedRoute />}> 
           <Route index element={<Dashboard />} />
-          <Route path="projects" element={<Projects />} />
-          <Route path="tasks" element={<Tasks />} />
+          <Route path="projects" element={<Navigate to="/#projects-section" replace />} />
+          <Route path="tasks" element={<Navigate to="/#tasks-section" replace />} />
+          <Route path="milestones" element={<Navigate to="/#milestones-section" replace />} />
+          <Route path="teams" element={<Navigate to="/#teams-section" replace />} />
         </Route>
         <Route path="*" element={<Navigate to={user ? '/' : '/login'} replace />} />
       </Routes>
