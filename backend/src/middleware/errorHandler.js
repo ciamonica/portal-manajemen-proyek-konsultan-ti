@@ -2,7 +2,7 @@
  * ========================================================
  * KATEGORI      : Middleware (Penanganan Error)
  * DESKRIPSI     : File middleware global untuk menangani error tak terduga.
- * FUNGSI UTAMA  : Menangkap pesan error dari sistem dan merespon client dengan pesan JSON terstruktur.
+ * FUNGSI UTAMA  : Menangkap pesan error dari sistem dan merespon Client dengan pesan JSON terstruktur.
  * ========================================================
  */
 

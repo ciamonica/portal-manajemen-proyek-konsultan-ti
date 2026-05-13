@@ -22,7 +22,7 @@ const router = express.Router();
  * Menghasilkan filter SQL untuk membatasi hak akses berdasarkan peran.
  */
 function roleFilter(user) {
-  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] }; // PM melihat log dari proyek yang dipegangnya
+  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] }; // Project Manager melihat log dari proyek yang dipegangnya
   if (user.role === 'client') return { clause: 'p.client_id = ?', params: [user.id] }; // Client melihat log proyek miliknya
   return { clause: 'tl.user_id = ?', params: [user.id] }; // Dev hanya melihat log waktunya sendiri
 }
@@ -54,7 +54,7 @@ router.get('/', async (req, res, next) => {
 
 /**
  * ENDPOINT: POST /api/time-logs
- * Mencatat jam kerja baru. Dev bisa mencatat waktunya, PM bisa mencatat untuk orang lain atau dirinya.
+ * Mencatat jam kerja baru. Dev bisa mencatat waktunya, Project Manager bisa mencatat untuk orang lain atau dirinya.
  */
 router.post('/', authorizeRoles('pm', 'dev'), async (req, res, next) => {
   try {

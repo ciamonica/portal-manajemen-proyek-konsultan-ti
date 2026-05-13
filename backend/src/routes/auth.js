@@ -60,7 +60,7 @@ router.post('/login', async (req, res, next) => {
       { expiresIn: getJwtExpiresIn() } // Masa berlaku token
     );
     
-    // Mengirimkan respons sukses beserta token dan data pengguna ke klien
+    // Mengirimkan respons sukses beserta token dan data pengguna ke Client
     res.json({ success: true, data: { token, user: { id: user.id, username: user.username, email: user.email, role: user.role } } });
   } catch (err) {
     // Jika terjadi error server (misal database mati), lempar ke errorHandler global

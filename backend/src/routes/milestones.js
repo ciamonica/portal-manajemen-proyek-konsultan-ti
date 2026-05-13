@@ -33,7 +33,7 @@ router.get('/', async (req, res, next) => {
 
     // Filter berdasarkan hak akses
     if (role === 'pm') {
-      query += ' JOIN projects p2 ON m.project_id = p2.id WHERE p2.pm_id = ?'; // PM hanya melihat milestone proyek miliknya
+      query += ' JOIN projects p2 ON m.project_id = p2.id WHERE p2.pm_id = ?'; // Project Manager hanya melihat milestone proyek miliknya
       params.push(userId);
     } else if (role === 'client') {
       query += ' JOIN projects p2 ON m.project_id = p2.id WHERE p2.client_id = ?'; // Client hanya melihat milestone proyeknya
@@ -56,7 +56,7 @@ router.get('/', async (req, res, next) => {
 
 /**
  * ENDPOINT: POST /api/milestones
- * Membuat milestone baru. Hanya diperbolehkan untuk PM.
+ * Membuat milestone baru. Hanya diperbolehkan untuk Project Manager.
  */
 router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -86,7 +86,7 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: PUT /api/milestones/:id
- * Memperbarui milestone yang ada berdasarkan ID. Hanya PM yang diizinkan.
+ * Memperbarui milestone yang ada berdasarkan ID. Hanya Project Manager yang diizinkan.
  */
 router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -122,7 +122,7 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: DELETE /api/milestones/:id
- * Menghapus milestone berdasarkan ID. Hanya dapat dilakukan oleh PM.
+ * Menghapus milestone berdasarkan ID. Hanya dapat dilakukan oleh Project Manager.
  */
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {

@@ -19,19 +19,19 @@ const router = express.Router();
 
 /**
  * ENDPOINT: GET /api/projects
- * Mengambil daftar proyek yang sesuai dengan hak akses (PM melihat proyeknya, Client melihat proyeknya, Dev melihat proyek yang ada task-nya).
+ * Mengambil daftar proyek yang sesuai dengan hak akses (Project Manager melihat proyeknya, Client melihat proyeknya, Dev melihat proyek yang ada task-nya).
  */
 router.get('/', async (req, res, next) => {
   try {
     const role = req.user.role; // Mengambil peran pengguna dari token
     const userId = req.user.id; // Mengambil ID pengguna dari token
-    // Query dasar untuk mengambil proyek beserta username client dan PM
+    // Query dasar untuk mengambil proyek beserta username Client dan Project Manager
     let query = 'SELECT p.*, u.username AS client_username, pm.username AS pm_username FROM projects p LEFT JOIN users u ON p.client_id = u.id LEFT JOIN users pm ON p.pm_id = pm.id';
     let params = []; // Parameter untuk query binding
 
     // Menyesuaikan query berdasarkan role
     if (role === 'pm') {
-      query += ' WHERE p.pm_id = ?'; // PM hanya melihat proyek yang ia kelola
+      query += ' WHERE p.pm_id = ?'; // Project Manager hanya melihat proyek yang ia kelola
       params.push(userId);
     } else if (role === 'client') {
       query += ' WHERE p.client_id = ?'; // Client hanya melihat proyek miliknya
@@ -53,7 +53,7 @@ router.get('/', async (req, res, next) => {
 
 /**
  * ENDPOINT: POST /api/projects
- * Membuat proyek baru (Hanya PM yang bisa).
+ * Membuat proyek baru (Hanya Project Manager yang bisa).
  */
 router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -73,7 +73,7 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
 
     // Mengambil ulang data proyek yang baru dibuat
     const [projectRows] = await pool.query('SELECT * FROM projects WHERE id = ?', [result.insertId]);
-    // Mengembalikan data ke klien dengan status 201 Created
+    // Mengembalikan data ke Client dengan status 201 Created
     res.status(201).json({ success: true, data: projectRows[0] });
   } catch (err) {
     next(err); // Tangani error
@@ -82,7 +82,7 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: PUT /api/projects/:id
- * Memperbarui data proyek tertentu (Hanya PM yang bisa).
+ * Memperbarui data proyek tertentu (Hanya Project Manager yang bisa).
  */
 router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -102,11 +102,11 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
       params.push(value);
     });
     
-    // Memastikan proyek diperbarui hanya jika PM yang login adalah pemiliknya
+    // Memastikan proyek diperbarui hanya jika Project Manager yang login adalah pemiliknya
     params.push(projectId, req.user.id);
     const [result] = await pool.query(`UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND pm_id = ?`, params);
     
-    // Jika tidak ada baris yang berubah, berarti ID salah atau bukan milik PM ini
+    // Jika tidak ada baris yang berubah, berarti ID salah atau bukan milik Project Manager ini
     if (!result.affectedRows) {
       return res.status(404).json({ success: false, error: 'Project not found' });
     }
@@ -121,12 +121,12 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: DELETE /api/projects/:id
- * Menghapus proyek berdasarkan ID (Hanya PM yang bisa).
+ * Menghapus proyek berdasarkan ID (Hanya Project Manager yang bisa).
  */
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const projectId = Number(req.params.id); // ID proyek dari parameter
-    // Menghapus proyek dari DB dengan memastikan kepemilikan PM
+    // Menghapus proyek dari DB dengan memastikan kepemilikan Project Manager
     const [result] = await pool.query('DELETE FROM projects WHERE id = ? AND pm_id = ?', [projectId, req.user.id]);
     
     // Jika gagal terhapus

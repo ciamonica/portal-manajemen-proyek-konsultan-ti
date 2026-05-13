@@ -165,7 +165,7 @@ paths:
   /tasks/{id}:
     put:
       tags: [Tasks]
-      summary: PM mengubah tugas, Developer mengubah status/progress tugasnya
+      summary: Project Manager mengubah tugas, Developer mengubah status/progress tugasnya
       parameters:
         - $ref: "#/components/parameters/Id"
       requestBody:

@@ -60,7 +60,7 @@ router.get('/', async (req, res, next) => {
       params.push(userId);
     } else if (role === 'pm') {
       baseQuery += ' JOIN projects p2 ON t.project_id = p2.id';
-      filters.push('p2.pm_id = ?'); // PM melihat tugas dari proyek yang ia pegang
+      filters.push('p2.pm_id = ?'); // Project Manager melihat tugas dari proyek yang ia pegang
       params.push(userId);
     }
 
@@ -77,7 +77,7 @@ router.get('/', async (req, res, next) => {
 
 /**
  * ENDPOINT: POST /api/tasks
- * Membuat tugas baru. Hanya PM yang bisa membuat tugas.
+ * Membuat tugas baru. Hanya Project Manager yang bisa membuat tugas.
  */
 router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -105,7 +105,7 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: PUT /api/tasks/:id
- * Mengupdate tugas. PM bisa ubah semua field, Dev hanya bisa ubah status dan progress.
+ * Mengupdate tugas. Project Manager bisa ubah semua field, Dev hanya bisa ubah status dan progress.
  */
 router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
   try {
@@ -135,7 +135,7 @@ router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
     }
 
     params.push(taskId, req.user.id);
-    // Kondisi WHERE berdasarkan role (PM harus owner project, Dev harus assignee)
+    // Kondisi WHERE berdasarkan role (Project Manager harus owner project, Dev harus assignee)
     const accessClause = req.user.role === 'pm' ? 'p.pm_id = ?' : 't.assigned_to = ?';
     
     // Update tasks
@@ -158,13 +158,13 @@ router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
 
 /**
  * ENDPOINT: DELETE /api/tasks/:id
- * Menghapus tugas. Hanya PM dari proyek tersebut yang diizinkan.
+ * Menghapus tugas. Hanya Project Manager dari proyek tersebut yang diizinkan.
  */
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const taskId = Number(req.params.id); // Mendapatkan ID tugas
     
-    // Menghapus hanya jika user login adalah PM dari proyek terkait
+    // Menghapus hanya jika user login adalah Project Manager dari proyek terkait
     const [result] = await pool.query(
       'DELETE t FROM tasks t JOIN projects p ON t.project_id = p.id WHERE t.id = ? AND p.pm_id = ?',
       [taskId, req.user.id]

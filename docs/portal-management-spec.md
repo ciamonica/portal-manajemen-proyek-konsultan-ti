@@ -1,6 +1,6 @@
 # Portal Manajemen Proyek untuk Konsultan TI
 
-Membangun sebuah **Portal Manajemen Proyek** khusus untuk konsultan TI memerlukan keseimbangan antara transparansi teknis bagi pengembang dan visibilitas strategis bagi client.
+Membangun sebuah **Portal Manajemen Proyek** khusus untuk konsultan TI memerlukan keseimbangan antara transparansi teknis bagi pengembang dan visibilitas strategis bagi Client.
 
 ---
 

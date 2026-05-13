@@ -22,7 +22,7 @@ const router = express.Router();
  * Membuat klausa SQL dinamis untuk filter akses berdasarkan role pengguna.
  */
 function roleFilter(user) {
-  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] }; // PM bisa melihat di proyeknya
+  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] }; // Project Manager bisa melihat di proyeknya
   if (user.role === 'client') return { clause: 'p.client_id = ?', params: [user.id] }; // Client melihat di proyeknya
   // Dev bisa melihat jika dia ditugaskan pada tugas utama atau tugas dependensinya
   return { clause: '(t.assigned_to = ? OR dt.assigned_to = ?)', params: [user.id, user.id] };
@@ -55,7 +55,7 @@ router.get('/', async (req, res, next) => {
 
 /**
  * ENDPOINT: POST /api/task-dependencies
- * Menambahkan relasi tugas baru (Hanya PM).
+ * Menambahkan relasi tugas baru (Hanya Project Manager).
  */
 router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -93,7 +93,7 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: PUT /api/task-dependencies/:id
- * Mengubah relasi dependensi yang sudah ada (Hanya PM).
+ * Mengubah relasi dependensi yang sudah ada (Hanya Project Manager).
  */
 router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -136,7 +136,7 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: DELETE /api/task-dependencies/:id
- * Menghapus relasi ketergantungan antar tugas (Hanya PM).
+ * Menghapus relasi ketergantungan antar tugas (Hanya Project Manager).
  */
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {

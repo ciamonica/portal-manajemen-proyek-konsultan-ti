@@ -14,7 +14,7 @@
 ## 2. Use Case Diagram
 
 1. Login / Logout
-2. PM mengelola proyek, tugas, dan tim
+2. Project Manager mengelola proyek, tugas, dan tim
 3. Developer melihat tugas yang ditugaskan dan memperbarui status
 4. Client memantau proyek dan milestone
 5. Dashboard menampilkan visualisasi performa
@@ -29,7 +29,7 @@
 
 ## 4. Spesifikasi Peran dan Auth
 
-- PM (Project Manager)
+- Project Manager
   - Bisa membuat/mengedit/hapus proyek
   - Akses CRUD penuh ke tugas
   - Akses endpoint `/api/users`

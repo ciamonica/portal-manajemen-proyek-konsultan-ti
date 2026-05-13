@@ -66,7 +66,7 @@ export default function Login() {
             </div>
             <div>
               <strong>Akses Peran</strong>
-              <span>Digunakan oleh project manager, pengembang, dan client.</span>
+              <span>Digunakan oleh Project Manager, pengembang, dan Client.</span>
             </div>
           </div>
         </section>

@@ -20,7 +20,7 @@ const router = express.Router();
 /**
  * FUNGSI BANTUAN: appendProjectAccessFilter
  * Menambahkan filter WHERE ke kueri SQL berdasarkan peran pengguna.
- * Memastikan PM/Client hanya melihat tautan dari proyek mereka, dan Dev hanya jika ditugaskan.
+ * Memastikan Project Manager/Client hanya melihat tautan dari proyek mereka, dan Dev hanya jika ditugaskan.
  */
 function appendProjectAccessFilter(query, params, user, projectColumn = 'pl.project_id') {
   if (user.role === 'pm') {
@@ -71,7 +71,7 @@ router.get('/', async (req, res, next) => {
 
 /**
  * ENDPOINT: POST /api/project-links
- * Menambahkan tautan eksternal baru ke suatu proyek. Hanya PM yang bisa menambahkan.
+ * Menambahkan tautan eksternal baru ke suatu proyek. Hanya Project Manager yang bisa menambahkan.
  */
 router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   try {

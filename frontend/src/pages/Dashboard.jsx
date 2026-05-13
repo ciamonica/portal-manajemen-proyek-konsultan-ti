@@ -81,6 +81,22 @@ function formatDate(value) {
   return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function getWeekKey(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  const normalized = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = normalized.getUTCDay() || 7;
+  normalized.setUTCDate(normalized.getUTCDate() - day + 1);
+  return normalized.toISOString().slice(0, 10);
+}
+
+function formatOneDecimal(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '0.0';
+  return number.toFixed(1);
+}
+
 function clampPercent(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return 0;
@@ -180,6 +196,13 @@ function generatedProjectImage(project) {
 
 function projectImage(project) {
   return project?.cover_image_url || generatedProjectImage(project);
+}
+
+function handleProjectImageError(event, project) {
+  const image = event.currentTarget;
+  if (image.dataset.fallbackImage === 'true') return;
+  image.dataset.fallbackImage = 'true';
+  image.src = generatedProjectImage(project);
 }
 
 function teamMemberNames(team) {
@@ -419,20 +442,35 @@ export default function Dashboard() {
     'At Risk': 'Berisiko',
     'On Track': 'Sesuai Jadwal'
   }[projectOverviewStatus];
-  const milestoneProgress = useMemo(() => milestones.slice(0, 6).map((milestone) => ({
-    ...milestone,
-    phase: milestone.name,
-    project: milestone.project_name,
-    percent: milestonePercent(milestone, tasks)
-  })), [milestones, tasks]);
+  const milestoneProgress = useMemo(() => milestones
+    .map((milestone) => ({
+      ...milestone,
+      phase: milestone.name,
+      project: milestone.project_name,
+      percent: milestonePercent(milestone, tasks)
+    }))
+    .sort((a, b) => {
+      const statusOrder = { pending: 0, achieved: 1 };
+      const statusDiff = (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2);
+      if (statusDiff) return statusDiff;
+      if (a.percent !== b.percent) return a.percent - b.percent;
+      return new Date(a.due_date || 0) - new Date(b.due_date || 0);
+    })
+    .slice(0, 6), [milestones, tasks]);
 
   const ganttItems = useMemo(() => [...filteredTasks]
-    .sort((a, b) => new Date(a.due_date || a.created_at || 0) - new Date(b.due_date || b.created_at || 0))
-    .slice(0, 6)
     .map((task) => ({
       ...task,
       percent: clampPercent(task.progress || (task.status === 'done' ? 100 : 0))
-    })), [filteredTasks]);
+    }))
+    .sort((a, b) => {
+      const statusOrder = { todo: 0, in_progress: 1, done: 2 };
+      const statusDiff = (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
+      if (statusDiff) return statusDiff;
+      if (a.percent !== b.percent) return a.percent - b.percent;
+      return new Date(a.due_date || a.created_at || 0) - new Date(b.due_date || b.created_at || 0);
+    })
+    .slice(0, 6), [filteredTasks]);
 
   const burnDownData = useMemo(() => buildBurnDownData(filteredTasks), [filteredTasks]);
   const automaticDelayRisks = useMemo(() => buildDelayRiskItems(tasks), [tasks]);
@@ -441,15 +479,23 @@ export default function Dashboard() {
     const totals = new Map();
     timeLogs.forEach((log) => {
       const key = log.user_id || log.username;
-      const current = totals.get(key) || { name: log.username || 'User', hours: 0 };
+      const current = totals.get(key) || { name: log.username || 'User', hours: 0, weeks: new Set() };
       current.hours += Number(log.hours || 0);
+      const weekKey = getWeekKey(log.log_date || log.created_at);
+      if (weekKey) current.weeks.add(weekKey);
       totals.set(key, current);
     });
-    return Array.from(totals.values()).map((member) => ({
-      ...member,
-      hours: Number(member.hours.toFixed(1)),
-      utilization: `${Math.round((member.hours / 40) * 100)}%`
-    }));
+    return Array.from(totals.values())
+      .map((member) => {
+        const weekCount = Math.max(member.weeks.size, 1);
+        const weeklyHours = member.hours / weekCount;
+        return {
+          name: member.name,
+          hours: formatOneDecimal(weeklyHours),
+          utilization: `${clampPercent((weeklyHours / 40) * 100)}%`
+        };
+      })
+      .sort((a, b) => Number(b.hours) - Number(a.hours));
   }, [timeLogs]);
 
   const timeTrackingEntries = useMemo(() => timeLogs.slice(0, 8).map((log) => ({
@@ -1088,32 +1134,45 @@ export default function Dashboard() {
             {
               label: 'Rencana',
               data: burnDownData.ideal,
-              borderColor: '#94a3b8',
+              borderColor: '#64748b',
               borderDash: [8, 6],
-              borderWidth: 2,
+              borderWidth: 2.5,
               pointRadius: 0,
+              borderCapStyle: 'round',
+              borderJoinStyle: 'round',
               fill: false,
-              tension: 0.35
+              tension: 0.22
             },
             {
               label: 'Aktual',
               data: burnDownData.actual,
               borderColor: '#2f8f83',
               backgroundColor: gradient,
-              borderWidth: 3,
+              borderWidth: 3.5,
               pointRadius: 4,
               pointHoverRadius: 6,
               pointBackgroundColor: '#ffffff',
               pointBorderColor: '#2f8f83',
               pointBorderWidth: 3,
+              borderCapStyle: 'round',
+              borderJoinStyle: 'round',
               fill: true,
-              tension: 0.42
+              tension: 0.22
             }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          devicePixelRatio: Math.max(1, window.devicePixelRatio || 1),
+          layout: {
+            padding: {
+              top: 10,
+              right: 12,
+              bottom: 4,
+              left: 8
+            }
+          },
           interaction: {
             intersect: false,
             mode: 'index'
@@ -1137,8 +1196,8 @@ export default function Dashboard() {
           scales: {
             y: {
               beginAtZero: true,
-              grid: { color: 'rgba(82, 103, 124, 0.12)', drawBorder: false },
-              ticks: { color: '#52677c' },
+              grid: { color: 'rgba(82, 103, 124, 0.16)', drawBorder: false },
+              ticks: { color: '#52677c', precision: 0, font: { size: 12, weight: 700 } },
               title: {
                 display: true,
                 text: 'Sisa Pekerjaan',
@@ -1148,7 +1207,7 @@ export default function Dashboard() {
             },
             x: {
               grid: { display: false },
-              ticks: { color: '#52677c', maxRotation: 0, autoSkipPadding: 18 },
+              ticks: { color: '#52677c', maxRotation: 0, autoSkipPadding: 24, font: { size: 12, weight: 700 } },
               title: {
                 display: true,
                 text: 'Waktu',
@@ -1265,7 +1324,7 @@ export default function Dashboard() {
           <div className="section-action-header">
             <div>
               <h2>Proyek</h2>
-              <p>Ringkasan proyek konsultasi TI, status, Project Manager, dan client.</p>
+              <p>Ringkasan proyek konsultasi TI, status, Project Manager, dan Client.</p>
             </div>
             {user.role === 'pm' && (
               <button type="button" className="mini-action-button" onClick={handleProjectCreateOpen}>
@@ -1277,7 +1336,7 @@ export default function Dashboard() {
             <div className="project-overview-grid">
               {projects.map((project) => (
                 <article key={project.id} className="project-card">
-                  <img className="project-card-image" src={projectImage(project)} alt="" />
+                  <img className="project-card-image" src={projectImage(project)} alt="" onError={(event) => handleProjectImageError(event, project)} />
                   <div className="project-card-header">
                     <h3>{project.name}</h3>
                     <span className={`status-pill status-${project.status || 'planning'}`}>
@@ -1287,7 +1346,7 @@ export default function Dashboard() {
                   <p>{project.description || 'Belum ada deskripsi.'}</p>
                   <div className="project-meta-grid">
                     <span>
-                      <strong>PM</strong>
+                      <strong>Project Manager</strong>
                       {project.pm_username || '-'}
                     </span>
                     <span>
@@ -1335,6 +1394,7 @@ export default function Dashboard() {
                   <div key={task.id} className="gantt-row">
                     <div className="gantt-row-main">
                       <span>{task.name}</span>
+                      <small>{labelFrom(TASK_STATUS_LABELS, task.status)} - {task.percent}%</small>
                     </div>
                     {user.role === 'pm' && (
                       <button type="button" className="text-action-button" onClick={() => handleTaskEdit(task)}>
@@ -1466,7 +1526,9 @@ export default function Dashboard() {
             <article className="monitoring-card">
               <h3>Burn-down Chart</h3>
               <p>Perbandingan sisa pekerjaan dan waktu tersedia.</p>
-              <canvas id="burndownChart" />
+              <div className="burndown-chart-frame">
+                <canvas id="burndownChart" aria-label="Burn-down chart sisa pekerjaan dan waktu" />
+              </div>
               <p className="monitoring-note">Pantau selisih aktual dan rencana.</p>
             </article>
 
@@ -1656,7 +1718,7 @@ export default function Dashboard() {
                 <label>
                   Client
                   <select value={projectForm.client_id} onChange={(e) => setProjectForm((prev) => ({ ...prev, client_id: e.target.value }))}>
-                    <option value="">Pilih client</option>
+                    <option value="">Pilih Client</option>
                     {users.filter((user) => user.role === 'client').map((user) => (
                       <option key={user.id} value={user.id}>{user.username}</option>
                     ))}
@@ -1665,7 +1727,7 @@ export default function Dashboard() {
                 <label>
                   Manajer Proyek
                   <select value={projectForm.pm_id} onChange={(e) => setProjectForm((prev) => ({ ...prev, pm_id: e.target.value }))}>
-                    <option value="">Pilih PM</option>
+                    <option value="">Pilih Project Manager</option>
                     {users.filter((user) => user.role === 'pm').map((user) => (
                       <option key={user.id} value={user.id}>{user.username}</option>
                     ))}
@@ -2052,7 +2114,7 @@ export default function Dashboard() {
                 {projects.length ? projects.map((project) => (
                   <div key={project.id} className="data-list-item">
                     <span className="data-list-with-image">
-                      <img src={projectImage(project)} alt="" />
+                      <img src={projectImage(project)} alt="" onError={(event) => handleProjectImageError(event, project)} />
                       {project.name}
                     </span>
                     <div className="data-actions">
@@ -2261,7 +2323,7 @@ export default function Dashboard() {
                 {projectFiles.length ? projectFiles.slice(0, 6).map((file) => (
                   <li key={file.id} className="inline-action-row">
                     <div>
-                      <a href={file.file_url} target="_blank" rel="noreferrer">{file.title}</a>
+                      <a className="file-repository-link" href={file.file_url} target="_blank" rel="noreferrer">{file.title}</a>
                       <small>{file.project_name || '-'} - {file.file_type || 'dokumen'}</small>
                     </div>
                     {user.role === 'pm' && (

@@ -22,7 +22,7 @@ const router = express.Router();
  * Menghasilkan filter SQL dinamis berdasarkan peran pengguna untuk membatasi akses data risiko.
  */
 function roleFilter(user) {
-  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] }; // PM melihat risiko proyeknya
+  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] }; // Project Manager melihat risiko proyeknya
   if (user.role === 'client') return { clause: 'p.client_id = ?', params: [user.id] }; // Client melihat risiko proyeknya
   // Dev melihat risiko proyek di mana ia ditugaskan
   return {
@@ -57,7 +57,7 @@ router.get('/', async (req, res, next) => {
 
 /**
  * ENDPOINT: POST /api/risks
- * Membuat risiko baru. Hanya bisa dilakukan oleh PM.
+ * Membuat risiko baru. Hanya bisa dilakukan oleh Project Manager.
  */
 router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -93,7 +93,7 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: PUT /api/risks/:id
- * Mengupdate data risiko berdasarkan ID. Hanya PM yang bisa.
+ * Mengupdate data risiko berdasarkan ID. Hanya Project Manager yang bisa.
  */
 router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -130,7 +130,7 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: DELETE /api/risks/:id
- * Menghapus data risiko berdasarkan ID. Hanya PM yang bisa.
+ * Menghapus data risiko berdasarkan ID. Hanya Project Manager yang bisa.
  */
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {

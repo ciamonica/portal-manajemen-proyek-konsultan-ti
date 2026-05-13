@@ -2,7 +2,7 @@
  * ========================================================
  * KATEGORI      : API Route (Manajemen Tim)
  * DESKRIPSI     : Endpoint untuk mengelola tim dan anggotanya.
- * FUNGSI UTAMA  : Membaca daftar tim, serta menambah, mengubah, dan menghapus tim dan anggota tim (khusus PM).
+ * FUNGSI UTAMA  : Membaca daftar tim, serta menambah, mengubah, dan menghapus tim dan anggota tim (khusus Project Manager).
  * ========================================================
  */
 
@@ -48,7 +48,7 @@ router.get('/', async (req, res, next) => {
 
 /**
  * ENDPOINT: POST /api/teams
- * Membuat tim baru dan langsung memasukkan anggotanya (Hanya PM).
+ * Membuat tim baru dan langsung memasukkan anggotanya (Hanya Project Manager).
  */
 router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -79,7 +79,7 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: PUT /api/teams/:id
- * Mengupdate nama tim dan menyinkronkan ulang anggotanya (Hanya PM).
+ * Mengupdate nama tim dan menyinkronkan ulang anggotanya (Hanya Project Manager).
  */
 router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {

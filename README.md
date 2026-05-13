@@ -33,7 +33,7 @@ Aplikasi ini sekarang mendukung stack modern dengan backend Node.js/Express, fro
 - Untuk mengganti data dummy lama pada database yang sudah ada, jalankan `backend/sql/seed_demo_data.sql`.
 
 ## Login Sample
-- PM: `adminfairy` / `adminfairy`
+- Project Manager: `adminfairy` / `adminfairy`
 - Dev: `dev1` / `adminfairy`
 - Client: `client1` / `adminfairy`
 - Semua akun demo lain juga memakai password `adminfairy`.
@@ -53,14 +53,14 @@ Aplikasi ini sekarang mendukung stack modern dengan backend Node.js/Express, fro
 - `GET /api/docs`
 - `POST /api/auth/login`
 - `GET /api/projects`
-- `POST /api/projects` (PM)
-- `PUT /api/projects/:id` (PM)
-- `DELETE /api/projects/:id` (PM)
+- `POST /api/projects` (Project Manager)
+- `PUT /api/projects/:id` (Project Manager)
+- `DELETE /api/projects/:id` (Project Manager)
 - `GET /api/tasks`
-- `POST /api/tasks` (PM)
-- `PUT /api/tasks/:id` (PM, DEV)
-- `DELETE /api/tasks/:id` (PM)
-- `GET /api/users` (PM)
+- `POST /api/tasks` (Project Manager)
+- `PUT /api/tasks/:id` (Project Manager, DEV)
+- `DELETE /api/tasks/:id` (Project Manager)
+- `GET /api/users` (Project Manager)
 - `GET /api/users/me`
 - `GET|POST|PUT|DELETE /api/project-links` (dashboard link proyek)
 - `GET|POST|PUT|DELETE /api/risks` (risk register)

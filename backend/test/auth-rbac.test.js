@@ -99,7 +99,7 @@ test('POST /api/auth/login rejects invalid credentials', async () => {
   assert.equal(response.body.success, false);
 });
 
-test('RBAC blocks client users from creating projects', async () => {
+test('RBAC blocks Client users from creating projects', async () => {
   const response = await request(app)
     .post('/api/projects')
     .set('Authorization', `Bearer ${authToken({ id: 3, role: 'client', username: 'client1' })}`)
@@ -110,7 +110,7 @@ test('RBAC blocks client users from creating projects', async () => {
   assert.equal(queryCalls.length, 0);
 });
 
-test('PM users can create projects through the protected route', async () => {
+test('Project Manager users can create projects through the protected route', async () => {
   const response = await request(app)
     .post('/api/projects')
     .set('Authorization', `Bearer ${authToken({ id: 1, role: 'pm', username: 'adminfairy' })}`)

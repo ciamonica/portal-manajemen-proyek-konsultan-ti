@@ -22,7 +22,7 @@ const router = express.Router();
  * Membatasi akses file berdasarkan peran pengguna.
  */
 function roleFilter(user) {
-  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] }; // PM melihat file proyeknya
+  if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] }; // Project Manager melihat file proyeknya
   if (user.role === 'client') return { clause: 'p.client_id = ?', params: [user.id] }; // Client melihat file proyeknya
   // Dev hanya melihat file dari proyek di mana dia memiliki task
   return {
@@ -57,7 +57,7 @@ router.get('/', async (req, res, next) => {
 
 /**
  * ENDPOINT: POST /api/project-files
- * Menambahkan rujukan file baru ke proyek. Hanya PM yang berhak mengupload.
+ * Menambahkan rujukan file baru ke proyek. Hanya Project Manager yang berhak mengupload.
  */
 router.post('/', authorizeRoles('pm'), async (req, res, next) => {
   try {
@@ -83,7 +83,7 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
 
 /**
  * ENDPOINT: PUT /api/project-files/:id
- * Mengupdate referensi file yang sudah ada (Hanya PM).
+ * Mengupdate referensi file yang sudah ada (Hanya Project Manager).
  */
 router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {

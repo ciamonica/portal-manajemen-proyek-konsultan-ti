@@ -2,7 +2,7 @@
  * ========================================================
  * KATEGORI      : Validator (Validasi Data Input)
  * DESKRIPSI     : File ini berisi definisi skema validasi menggunakan library Zod.
- * FUNGSI UTAMA  : Memastikan data yang dikirimkan oleh klien sesuai dengan format dan aturan yang diharapkan sebelum diproses ke database.
+ * FUNGSI UTAMA  : Memastikan data yang dikirimkan oleh Client sesuai dengan format dan aturan yang diharapkan sebelum diproses ke database.
  * ========================================================
  */
 
@@ -49,8 +49,8 @@ const projectCreateSchema = z.object({
   start_date: z.string().optional(), // Tanggal mulai proyek
   end_date: z.string().optional(), // Tanggal selesai proyek
   status: z.enum(['planning', 'in_progress', 'completed', 'on_hold', 'on_track', 'at_risk', 'delayed']).optional(), // Status proyek (opsional, ada default di DB)
-  client_id: z.number().int().optional(), // ID klien (foreign key)
-  pm_id: z.number().int().optional(), // ID PM pengelola proyek
+  client_id: z.number().int().optional(), // ID Client (foreign key)
+  pm_id: z.number().int().optional(), // ID Project Manager pengelola proyek
   cover_image_url: z.string().url().optional().or(z.literal('')) // URL gambar cover opsional atau string kosong
 });
 

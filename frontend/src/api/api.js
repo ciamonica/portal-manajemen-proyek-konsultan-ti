@@ -41,7 +41,7 @@ async function request(path, options = {}) {
   return data;
 }
 
-// Objek klien API dengan metode shorthand
+// Objek Client API dengan metode shorthand
 export const apiClient = {
   get: (path) => request(path, { method: 'GET' }),
   post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),

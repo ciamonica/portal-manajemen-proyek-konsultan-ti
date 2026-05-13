@@ -20,7 +20,7 @@ const router = express.Router();
 /**
  * FUNGSI BANTUAN: roleFilter
  * Memastikan bahwa komentar hanya bisa dibaca oleh pengguna yang relevan
- * (PM proyek, Client proyek, atau Developer yang ditugaskan ke task tersebut).
+ * (Project Manager proyek, Client proyek, atau Developer yang ditugaskan ke task tersebut).
  */
 function roleFilter(user) {
   if (user.role === 'pm') return { clause: 'p.pm_id = ?', params: [user.id] };
@@ -81,7 +81,7 @@ router.post('/', async (req, res, next) => {
 
 /**
  * ENDPOINT: PUT /api/task-comments/:id
- * Mengupdate isi komentar. PM bisa ganti apa saja, selain PM hanya bisa ganti miliknya sendiri.
+ * Mengupdate isi komentar. Project Manager bisa ganti apa saja, selain Project Manager hanya bisa ganti miliknya sendiri.
  */
 router.put('/:id', async (req, res, next) => {
   try {
@@ -108,7 +108,7 @@ router.put('/:id', async (req, res, next) => {
     params.push(commentId);
     let query = `UPDATE task_comments SET ${updates.join(', ')} WHERE id = ?`;
     
-    // Batasi update hanya pada komentar sendiri, kecuali role PM (bisa ubah semua)
+    // Batasi update hanya pada komentar sendiri, kecuali role Project Manager (bisa ubah semua)
     if (req.user.role !== 'pm') {
       query += ' AND user_id = ?';
       params.push(req.user.id);
@@ -131,7 +131,7 @@ router.put('/:id', async (req, res, next) => {
 
 /**
  * ENDPOINT: DELETE /api/task-comments/:id
- * Menghapus komentar. Diatur hanya PM yang boleh menghapus di sini.
+ * Menghapus komentar. Diatur hanya Project Manager yang boleh menghapus di sini.
  */
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {

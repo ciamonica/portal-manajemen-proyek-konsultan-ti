@@ -27,7 +27,7 @@
 - Unit / Integration
   - File: `backend/test/auth-rbac.test.js`
   - Tes login valid/invalid
-  - Tes RBAC create project untuk role client dan pm
+  - Tes RBAC create project untuk role Client dan Project Manager
   - Tes validasi input create task sebelum insert database
   - Tes scope data developer pada endpoint `/api/projects`
   - Perintah: `cd backend && npm test`
