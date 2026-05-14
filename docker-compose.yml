@@ -1,56 +1,73 @@
 # ========================================================
 # KATEGORI      : Docker Compose Configuration (Root)
 # DESKRIPSI     : Mengatur deployment seluruh arsitektur proyek (MySQL, Backend, Frontend).
+# FUNGSI UTAMA  : Mendefinisikan 3 layanan (services) yang saling terhubung untuk menjalankan aplikasi secara kontainer.
 # ========================================================
 
 services:
+  # --------------------------------------------------------
+  # SERVICE: MySQL Database
+  # Menyediakan database relasional untuk menyimpan seluruh data aplikasi.
+  # --------------------------------------------------------
   mysql:
-    image: mysql:8.4
-    container_name: portal-management-mysql
+    image: mysql:8.4                                    # Menggunakan image MySQL versi 8.4
+    container_name: portal-management-mysql             # Nama kontainer untuk identifikasi
     environment:
-      MYSQL_DATABASE: project_portal
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: project_portal                    # Nama database yang otomatis dibuat saat pertama kali
+      MYSQL_ROOT_PASSWORD: rootpassword                 # Password root MySQL (ganti di produksi)
     ports:
-      - "3306:3306"
+      - "3306:3306"                                    # Memetakan port MySQL ke host
     volumes:
-      - mysql-data:/var/lib/mysql
-      - ./database.sql:/docker-entrypoint-initdb.d/01-database.sql:ro
+      - mysql-data:/var/lib/mysql                      # Volume persisten agar data tidak hilang saat restart
+      - ./database.sql:/docker-entrypoint-initdb.d/01-database.sql:ro  # Script inisialisasi database
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpassword"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpassword"]  # Cek kesehatan MySQL
+      interval: 10s                                    # Interval pengecekan setiap 10 detik
+      timeout: 5s                                      # Timeout per pengecekan
+      retries: 10                                      # Jumlah percobaan sebelum dianggap unhealthy
 
+  # --------------------------------------------------------
+  # SERVICE: Backend (Node.js / Express)
+  # Menyediakan REST API untuk frontend dan menangani logika bisnis.
+  # --------------------------------------------------------
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
-    container_name: portal-management-backend
+      context: .                                       # Konteks build dari root proyek
+      dockerfile: backend/Dockerfile                   # Lokasi Dockerfile backend
+    container_name: portal-management-backend          # Nama kontainer backend
     environment:
-      NODE_ENV: production
-      PORT: 4000
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_NAME: project_portal
-      DB_USER: root
-      DB_PASSWORD: rootpassword
-      JWT_SECRET: change_this_to_a_long_random_secret
-      JWT_EXPIRES_IN: 2h
-      CORS_ORIGIN: http://localhost:8080
+      NODE_ENV: production                             # Mode produksi (mengaktifkan optimasi)
+      PORT: 4000                                       # Port yang digunakan Express
+      DB_HOST: mysql                                   # Hostname database (nama service Docker)
+      DB_PORT: 3306                                    # Port database MySQL
+      DB_NAME: project_portal                          # Nama database yang digunakan
+      DB_USER: root                                    # Username database
+      DB_PASSWORD: rootpassword                        # Password database (ganti di produksi)
+      JWT_SECRET: change_this_to_a_long_random_secret  # Kunci rahasia JWT (WAJIB diganti di produksi)
+      JWT_EXPIRES_IN: 2h                               # Masa berlaku token JWT
+      CORS_ORIGIN: http://localhost:8080               # Origin yang diizinkan untuk CORS
     depends_on:
       mysql:
-        condition: service_healthy
+        condition: service_healthy                     # Backend baru start setelah MySQL sehat
     ports:
-      - "4000:4000"
+      - "4000:4000"                                    # Memetakan port backend ke host
 
+  # --------------------------------------------------------
+  # SERVICE: Frontend (React + Nginx)
+  # Menyajikan aplikasi React yang sudah di-build melalui Nginx.
+  # --------------------------------------------------------
   frontend:
     build:
-      context: ./frontend
-    container_name: portal-management-frontend
+      context: ./frontend                              # Konteks build dari folder frontend
+    container_name: portal-management-frontend         # Nama kontainer frontend
     depends_on:
-      - backend
+      - backend                                        # Frontend baru start setelah backend siap
     ports:
-      - "8080:80"
+      - "8080:80"                                      # Memetakan port Nginx (80) ke port host (8080)
 
+# --------------------------------------------------------
+# VOLUMES
+# Mendefinisikan volume persisten untuk penyimpanan data.
+# --------------------------------------------------------
 volumes:
-  mysql-data:
+  mysql-data:                                          # Volume untuk data MySQL agar persisten antar restart

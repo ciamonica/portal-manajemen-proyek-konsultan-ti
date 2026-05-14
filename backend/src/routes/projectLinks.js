@@ -42,10 +42,18 @@ function appendProjectAccessFilter(query, params, user, projectColumn = 'pl.proj
   };
 }
 
+/**
+ * FUNGSI BANTUAN: hasExplicitProjectId
+ * Mengecek apakah data memiliki project_id yang eksplisit (bukan null/undefined).
+ */
 function hasExplicitProjectId(data) {
   return Object.prototype.hasOwnProperty.call(data, 'project_id') && data.project_id !== null;
 }
 
+/**
+ * FUNGSI BANTUAN: normalizeProjectId
+ * Mengembalikan project_id dari data jika eksplisit, atau null jika tidak (tautan global).
+ */
 function normalizeProjectId(data) {
   return hasExplicitProjectId(data) ? data.project_id : null;
 }

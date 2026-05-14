@@ -6,13 +6,20 @@
  * ========================================================
  */
 
+// Base URL untuk semua panggilan API (dari environment variable atau default '/api')
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
+/**
+ * FUNGSI: clearStoredSession
+ * Membersihkan semua data sesi otentikasi dari sessionStorage dan localStorage.
+ * Dipanggil saat token expired atau respons 401 diterima dari backend.
+ */
 function clearStoredSession() {
   sessionStorage.removeItem('project_portal_token');
   sessionStorage.removeItem('project_portal_user');
   localStorage.removeItem('project_portal_token');
   localStorage.removeItem('project_portal_user');
+  // Mengirim event kustom agar AuthContext bisa merespons (logout otomatis)
   window.dispatchEvent(new Event('project-portal-auth-expired'));
 }
 

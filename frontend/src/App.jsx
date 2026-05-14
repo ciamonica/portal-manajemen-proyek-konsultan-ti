@@ -6,11 +6,17 @@
  * ========================================================
  */
 
+// Mengimpor hook useEffect dari React untuk efek samping (side effects)
 import { useEffect } from 'react';
+// Mengimpor komponen routing dari React Router DOM
 import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
+// Mengimpor hook otentikasi untuk mendapatkan data user dan fungsi logout
 import { useAuth } from './context/AuthContext.jsx';
+// Mengimpor halaman Login
 import Login from './pages/Login.jsx';
+// Mengimpor halaman Dashboard
 import Dashboard from './pages/Dashboard.jsx';
+// Mengimpor komponen pelindung rute (memerlukan login)
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 const APP_NAME = 'Portal Manajemen';
@@ -50,6 +56,11 @@ function App() {
     });
   }, [location.pathname, location.hash]);
 
+  /**
+   * FUNGSI: handleCategoryNavClick
+   * Menangani klik pada link navigasi kategori di navbar.
+   * Mencegah navigasi default dan memicu event kustom untuk toggle kategori dashboard.
+   */
   const handleCategoryNavClick = (event, hash) => {
     event.preventDefault();
     navigate(`/${hash}`);

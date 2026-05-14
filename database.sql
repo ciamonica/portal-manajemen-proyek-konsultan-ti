@@ -2,15 +2,21 @@
 -- KATEGORI      : Database Schema & Seed (Root)
 -- DESKRIPSI     : Script lengkap inisialisasi struktur tabel dan data demo.
 -- FUNGSI UTAMA  : Mengatur ulang database untuk keperluan pengujian / demo.
+-- CATATAN       : File ini digunakan oleh Docker untuk inisialisasi database otomatis.
 -- ========================================================
 
 -- Database Schema for Portal Manajemen Proyek Konsultan TI
 -- Import this file into XAMPP MySQL
 
+-- Membuat database jika belum ada
 CREATE DATABASE IF NOT EXISTS project_portal;
+-- Menggunakan database project_portal
 USE project_portal;
 
--- Users table
+-- --------------------------------------------------------
+-- TABEL: users
+-- Menyimpan data pengguna sistem (PM, Developer, Client).
+-- --------------------------------------------------------
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -21,6 +27,10 @@ CREATE TABLE users (
     KEY idx_users_role (role)
 );
 
+-- --------------------------------------------------------
+-- TABEL: projects
+-- Menyimpan data proyek konsultasi TI.
+-- --------------------------------------------------------
 -- Projects table
 CREATE TABLE projects (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -40,6 +50,10 @@ CREATE TABLE projects (
     FOREIGN KEY (pm_id) REFERENCES users(id)
 );
 
+-- --------------------------------------------------------
+-- TABEL: tasks
+-- Menyimpan data tugas/pekerjaan dalam proyek.
+-- --------------------------------------------------------
 -- Tasks table
 CREATE TABLE tasks (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -58,6 +72,10 @@ CREATE TABLE tasks (
     FOREIGN KEY (assigned_to) REFERENCES users(id)
 );
 
+-- --------------------------------------------------------
+-- TABEL: milestones
+-- Menyimpan pencapaian kunci (milestone) proyek.
+-- --------------------------------------------------------
 -- Milestones table
 CREATE TABLE milestones (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -71,6 +89,10 @@ CREATE TABLE milestones (
     FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 
+-- --------------------------------------------------------
+-- TABEL: teams
+-- Menyimpan data tim yang bekerja pada proyek.
+-- --------------------------------------------------------
 -- Teams table
 CREATE TABLE teams (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -81,6 +103,10 @@ CREATE TABLE teams (
     FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 
+-- --------------------------------------------------------
+-- TABEL: team_members
+-- Tabel pivot (many-to-many) antara tim dan pengguna.
+-- --------------------------------------------------------
 -- Team members (many-to-many)
 CREATE TABLE team_members (
     team_id INT,
@@ -91,6 +117,10 @@ CREATE TABLE team_members (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- --------------------------------------------------------
+-- TABEL: time_logs
+-- Menyimpan catatan jam kerja per tugas.
+-- --------------------------------------------------------
 -- Time logs for resource utilization
 CREATE TABLE time_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -105,6 +135,10 @@ CREATE TABLE time_logs (
     FOREIGN KEY (task_id) REFERENCES tasks(id)
 );
 
+-- --------------------------------------------------------
+-- TABEL: task_comments
+-- Menyimpan komentar/diskusi pada tugas.
+-- --------------------------------------------------------
 -- Task comments
 CREATE TABLE task_comments (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -118,6 +152,10 @@ CREATE TABLE task_comments (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- --------------------------------------------------------
+-- TABEL: project_links
+-- Menyimpan tautan eksternal terkait proyek (API docs, BRD, repo).
+-- --------------------------------------------------------
 -- Dashboard links managed from DB
 CREATE TABLE project_links (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -132,6 +170,10 @@ CREATE TABLE project_links (
     FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 
+-- --------------------------------------------------------
+-- TABEL: risks
+-- Menyimpan data risiko yang teridentifikasi pada proyek.
+-- --------------------------------------------------------
 -- Risk register managed from DB
 CREATE TABLE risks (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -151,6 +193,10 @@ CREATE TABLE risks (
     FOREIGN KEY (owner_id) REFERENCES users(id)
 );
 
+-- --------------------------------------------------------
+-- TABEL: task_dependencies
+-- Menyimpan relasi ketergantungan antar tugas.
+-- --------------------------------------------------------
 -- Task dependencies for dynamic dependency board
 CREATE TABLE task_dependencies (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -163,6 +209,10 @@ CREATE TABLE task_dependencies (
     FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id)
 );
 
+-- --------------------------------------------------------
+-- TABEL: project_files
+-- Menyimpan referensi file/dokumen yang dilampirkan pada proyek.
+-- --------------------------------------------------------
 -- Project file repository metadata
 CREATE TABLE project_files (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -177,6 +227,12 @@ CREATE TABLE project_files (
     FOREIGN KEY (project_id) REFERENCES projects(id),
     FOREIGN KEY (uploaded_by) REFERENCES users(id)
 );
+
+-- ========================================================
+-- BAGIAN 2: DATA DEMO (SEED)
+-- Memasukkan data contoh untuk keperluan pengujian dan demonstrasi.
+-- Semua user demo menggunakan password: adminfairy
+-- ========================================================
 
 -- Rich demo data. All demo users use password: adminfairy.
 -- IDs are explicit so project, task, and client relations stay stable.

@@ -13,6 +13,13 @@ const { authorizeRoles } = require('../middleware/auth');
 
 const router = express.Router();
 
+/**
+ * FUNGSI BANTUAN: buildTeamAccessQuery
+ * Membangun query SQL dinamis untuk mengambil daftar tim berdasarkan hak akses pengguna.
+ * - PM: melihat tim dari proyek yang dikelolanya atau tim tanpa proyek
+ * - Client: melihat tim dari proyek miliknya
+ * - Dev: hanya melihat tim di mana ia menjadi anggota
+ */
 function buildTeamAccessQuery(user) {
   let query = `
     SELECT DISTINCT t.*, p.name AS project_name
@@ -36,6 +43,10 @@ function buildTeamAccessQuery(user) {
   return { query, params };
 }
 
+/**
+ * FUNGSI BANTUAN: ensureProjectManagedByPm
+ * Memverifikasi bahwa proyek tertentu dikelola oleh PM yang sedang login.
+ */
 async function ensureProjectManagedByPm(projectId, pmId) {
   const [rows] = await pool.query(
     'SELECT id FROM projects WHERE id = ? AND pm_id = ?',
@@ -44,6 +55,11 @@ async function ensureProjectManagedByPm(projectId, pmId) {
   return rows.length > 0;
 }
 
+/**
+ * FUNGSI BANTUAN: ensureTeamManagedByPm
+ * Memverifikasi bahwa tim tertentu berada di proyek yang dikelola oleh PM,
+ * atau tim tersebut tidak terikat proyek (global).
+ */
 async function ensureTeamManagedByPm(teamId, pmId) {
   const [rows] = await pool.query(
     `

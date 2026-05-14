@@ -6,11 +6,16 @@
  * ========================================================
  */
 
+// Mengimpor hook useState dari React untuk mengelola state lokal komponen
 import { useState } from 'react';
+// Mengimpor hook useNavigate untuk navigasi programatik antar halaman
 import { useNavigate } from 'react-router-dom';
+// Mengimpor hook otentikasi untuk mengakses fungsi login
 import { useAuth } from '../context/AuthContext.jsx';
 
+// Konstanta nama aplikasi untuk ditampilkan di halaman login
 const APP_NAME = 'Portal Manajemen';
+// Konstanta nama lengkap aplikasi
 const FULL_APP_NAME = 'Proyek Konsultan TI';
 
 export default function Login() {

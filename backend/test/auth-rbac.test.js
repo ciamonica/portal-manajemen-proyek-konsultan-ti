@@ -1,24 +1,40 @@
 /**
  * ========================================================
  * KATEGORI      : Pengujian (Backend)
- * DESKRIPSI     : File berisi unit testing untuk autentikasi dan RBAC.
+ * DESKRIPSI     : File berisi unit testing untuk autentikasi dan RBAC (Role-Based Access Control).
  * FUNGSI UTAMA  : Memastikan login, otorisasi peran, dan isolasi akses data berfungsi benar.
+ * TEKNOLOGI     : Node.js built-in test runner, supertest untuk HTTP testing.
  * ========================================================
  */
 
+// Mengimpor modul test bawaan Node.js
 const test = require('node:test');
+// Mengimpor modul assert untuk validasi hasil test
 const assert = require('node:assert/strict');
+// Mengimpor bcrypt untuk membuat hash password test
 const bcrypt = require('bcrypt');
+// Mengimpor jsonwebtoken untuk membuat token test
 const jwt = require('jsonwebtoken');
+// Mengimpor supertest untuk melakukan HTTP request ke Express app
 const request = require('supertest');
 
+// Menetapkan environment ke 'test' agar konfigurasi menyesuaikan
 process.env.NODE_ENV = 'test';
+// Menetapkan JWT secret khusus untuk testing
 process.env.JWT_SECRET = 'test_jwt_secret_for_portal_management';
+// Menetapkan masa berlaku token test
 process.env.JWT_EXPIRES_IN = '1h';
 
+// Membuat hash password 'adminfairy' dengan salt round rendah (4) untuk kecepatan test
 const passwordHash = bcrypt.hashSync('adminfairy', 4);
+// Array untuk merekam semua panggilan query database (untuk verifikasi)
 const queryCalls = [];
 
+/**
+ * MOCK DATABASE POOL
+ * Objek tiruan (mock) yang menggantikan koneksi database asli.
+ * Mengembalikan data palsu berdasarkan pola SQL yang diterima.
+ */
 const mockPool = {
   async query(sql, params = []) {
     queryCalls.push({ sql: String(sql).replace(/\s+/g, ' ').trim(), params });
@@ -116,6 +132,11 @@ const mockPool = {
   }
 };
 
+/**
+ * INJEKSI MOCK KE MODUL CACHE
+ * Mengganti modul database asli (db.js) dengan mockPool di cache require Node.js.
+ * Ini memastikan semua route yang mengimpor '../db' akan mendapatkan mock ini.
+ */
 const dbPath = require.resolve('../src/db');
 require.cache[dbPath] = {
   id: dbPath,
@@ -124,16 +145,23 @@ require.cache[dbPath] = {
   exports: mockPool
 };
 
+// Mengimpor aplikasi Express setelah mock terpasang
 const app = require('../src/app');
 
+/**
+ * FUNGSI BANTUAN: authToken
+ * Membuat token JWT untuk simulasi pengguna yang login dalam test.
+ */
 function authToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 }
 
+// Membersihkan rekaman query sebelum setiap test case
 test.beforeEach(() => {
   queryCalls.length = 0;
 });
 
+// Test: Login berhasil dengan kredensial yang valid
 test('POST /api/auth/login returns JWT and user data for valid credentials', async () => {
   const response = await request(app)
     .post('/api/auth/login')
@@ -145,6 +173,7 @@ test('POST /api/auth/login returns JWT and user data for valid credentials', asy
   assert.equal(response.body.data.user.role, 'pm');
 });
 
+// Test: Login ditolak dengan kredensial yang salah
 test('POST /api/auth/login rejects invalid credentials', async () => {
   const response = await request(app)
     .post('/api/auth/login')
@@ -154,6 +183,7 @@ test('POST /api/auth/login rejects invalid credentials', async () => {
   assert.equal(response.body.success, false);
 });
 
+// Test: RBAC memblokir Client dari membuat proyek
 test('RBAC blocks Client users from creating projects', async () => {
   const response = await request(app)
     .post('/api/projects')
@@ -165,6 +195,7 @@ test('RBAC blocks Client users from creating projects', async () => {
   assert.equal(queryCalls.length, 0);
 });
 
+// Test: Project Manager bisa membuat proyek melalui rute yang dilindungi
 test('Project Manager users can create projects through the protected route', async () => {
   const response = await request(app)
     .post('/api/projects')
@@ -176,6 +207,7 @@ test('Project Manager users can create projects through the protected route', as
   assert.equal(response.body.data.id, 99);
 });
 
+// Test: Validasi input tugas sebelum insert ke database
 test('task creation validates required input before inserting', async () => {
   const response = await request(app)
     .post('/api/tasks')
@@ -187,6 +219,7 @@ test('task creation validates required input before inserting', async () => {
   assert.equal(queryCalls.length, 0);
 });
 
+// Test: PM hanya bisa membuat tugas di proyek yang dikelolanya
 test('Project Manager task creation is limited to managed projects', async () => {
   const response = await request(app)
     .post('/api/tasks')
@@ -199,6 +232,7 @@ test('Project Manager task creation is limited to managed projects', async () =>
   assert.equal(queryCalls.some((call) => /INSERT INTO tasks/.test(call.sql)), false);
 });
 
+// Test: PM bisa membuat tugas setelah kepemilikan proyek diverifikasi
 test('Project Manager can create tasks only after project ownership is verified', async () => {
   const response = await request(app)
     .post('/api/tasks')
@@ -212,6 +246,7 @@ test('Project Manager can create tasks only after project ownership is verified'
   assert.equal(queryCalls.some((call) => /INSERT INTO tasks/.test(call.sql)), true);
 });
 
+// Test: PM hanya bisa membuat risiko di proyek yang dikelolanya
 test('Project Manager risk creation is limited to managed projects', async () => {
   const response = await request(app)
     .post('/api/risks')
@@ -223,6 +258,7 @@ test('Project Manager risk creation is limited to managed projects', async () =>
   assert.equal(queryCalls.some((call) => /INSERT INTO risks/.test(call.sql)), false);
 });
 
+// Test: PM hanya bisa membuat milestone di proyek yang dikelolanya
 test('Project Manager milestone creation is limited to managed projects', async () => {
   const response = await request(app)
     .post('/api/milestones')
@@ -234,6 +270,7 @@ test('Project Manager milestone creation is limited to managed projects', async 
   assert.equal(queryCalls.some((call) => /INSERT INTO milestones/.test(call.sql)), false);
 });
 
+// Test: PM hanya bisa membuat file di proyek yang dikelolanya
 test('Project Manager file creation is limited to managed projects', async () => {
   const response = await request(app)
     .post('/api/project-files')
@@ -250,6 +287,7 @@ test('Project Manager file creation is limited to managed projects', async () =>
   assert.equal(queryCalls.some((call) => /INSERT INTO project_files/.test(call.sql)), false);
 });
 
+// Test: PM hanya bisa membuat link di proyek yang dikelolanya
 test('Project Manager link creation is limited to managed projects', async () => {
   const response = await request(app)
     .post('/api/project-links')
@@ -266,6 +304,7 @@ test('Project Manager link creation is limited to managed projects', async () =>
   assert.equal(queryCalls.some((call) => /INSERT INTO project_links/.test(call.sql)), false);
 });
 
+// Test: PM tidak bisa memperlakukan project_id 0 sebagai global
 test('Project Manager link creation does not treat project_id zero as global', async () => {
   const response = await request(app)
     .post('/api/project-links')
@@ -282,6 +321,7 @@ test('Project Manager link creation does not treat project_id zero as global', a
   assert.equal(queryCalls.some((call) => /INSERT INTO project_links/.test(call.sql)), false);
 });
 
+// Test: PM hanya bisa membuat dependensi untuk tugas di proyek yang dikelolanya
 test('Project Manager dependency creation is limited to tasks in managed projects', async () => {
   const response = await request(app)
     .post('/api/task-dependencies')
@@ -293,6 +333,7 @@ test('Project Manager dependency creation is limited to tasks in managed project
   assert.equal(queryCalls.some((call) => /INSERT INTO task_dependencies/.test(call.sql)), false);
 });
 
+// Test: Client hanya bisa berkomentar pada tugas yang bisa diaksesnya
 test('client comments are limited to accessible tasks', async () => {
   const response = await request(app)
     .post('/api/task-comments')
@@ -304,6 +345,7 @@ test('client comments are limited to accessible tasks', async () => {
   assert.equal(queryCalls.some((call) => /INSERT INTO task_comments/.test(call.sql)), false);
 });
 
+// Test: Developer hanya bisa mencatat waktu pada tugas yang bisa diaksesnya
 test('developer time logs are limited to accessible tasks', async () => {
   const response = await request(app)
     .post('/api/time-logs')
@@ -315,6 +357,7 @@ test('developer time logs are limited to accessible tasks', async () => {
   assert.equal(queryCalls.some((call) => /INSERT INTO time_logs/.test(call.sql)), false);
 });
 
+// Test: PM tidak bisa menghapus file di luar proyek yang dikelolanya
 test('Project Manager cannot delete files outside managed projects', async () => {
   const response = await request(app)
     .delete('/api/project-files/99')
@@ -325,6 +368,7 @@ test('Project Manager cannot delete files outside managed projects', async () =>
   assert.equal(queryCalls.some((call) => /DELETE FROM project_files/.test(call.sql)), false);
 });
 
+// Test: Developer hanya bisa melihat proyek yang memiliki tugas yang ditugaskan kepadanya
 test('developer project reads are scoped to assigned tasks', async () => {
   const response = await request(app)
     .get('/api/projects')
@@ -336,6 +380,7 @@ test('developer project reads are scoped to assigned tasks', async () => {
   assert.deepEqual(queryCalls[0].params, [2]);
 });
 
+// Test: Client hanya bisa melihat tim di proyek yang dimilikinya
 test('client team reads are scoped to owned projects', async () => {
   const response = await request(app)
     .get('/api/teams')
@@ -347,6 +392,7 @@ test('client team reads are scoped to owned projects', async () => {
   assert.deepEqual(queryCalls[0].params, [3]);
 });
 
+// Test: Developer hanya bisa melihat tim yang dia menjadi anggotanya
 test('developer team reads are scoped to explicit team membership', async () => {
   const response = await request(app)
     .get('/api/teams')

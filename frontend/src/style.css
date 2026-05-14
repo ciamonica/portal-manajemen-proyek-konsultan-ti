@@ -1,3 +1,22 @@
+/**
+ * ========================================================
+ * KATEGORI      : Stylesheet Utama (Frontend)
+ * DESKRIPSI     : File CSS global untuk seluruh tampilan aplikasi Portal Manajemen Proyek.
+ * FUNGSI UTAMA  : Mengatur tata letak, warna, tipografi, komponen UI, dan responsivitas.
+ * STRUKTUR      :
+ *   1. CSS Variables & Base Styles
+ *   2. Layout (App Shell, Navigation, Page)
+ *   3. Komponen Autentikasi (Login)
+ *   4. Dashboard (Cards, Charts, Tables, Forms)
+ *   5. Komponen Data Management (CRUD Forms, Lists)
+ *   6. Responsive & Media Queries
+ * ========================================================
+ */
+
+/* --------------------------------------------------------
+ * BAGIAN 1: CSS VARIABLES & BASE STYLES
+ * Mendefinisikan variabel warna, font, dan gaya dasar aplikasi.
+ * -------------------------------------------------------- */
 :root {
   color-scheme: light;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -25,6 +44,10 @@ button {
   cursor: pointer;
 }
 
+/* --------------------------------------------------------
+ * BAGIAN 2: LAYOUT - APP SHELL & NAVIGASI
+ * Mengatur struktur utama aplikasi dan navigasi atas (top-nav).
+ * -------------------------------------------------------- */
 .app-shell {
   min-height: 100vh;
 }
