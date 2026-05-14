@@ -14,6 +14,7 @@ const pool = require('../db');
 const { projectFileSchema, parseSchema } = require('../validators/schemas');
 // Mengimpor middleware otorisasi
 const { authorizeRoles } = require('../middleware/auth');
+const { projectManagedByPm, projectRecordManagedByPm } = require('../utils/accessControl');
 
 const router = express.Router();
 
@@ -67,6 +68,11 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
 
+    const canManageProject = await projectManagedByPm(data.project_id, req.user.id);
+    if (!canManageProject) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
     // Melakukan operasi Insert ke database
     const [result] = await pool.query(
       'INSERT INTO project_files (project_id, title, file_url, file_type, uploaded_by) VALUES (?, ?, ?, ?, ?)',
@@ -92,6 +98,18 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
     const { data, error } = parseSchema(projectFileSchema.partial(), req.body);
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
+    }
+
+    const canManageFile = await projectRecordManagedByPm('project_files', 'pf', fileId, req.user.id);
+    if (!canManageFile) {
+      return res.status(404).json({ success: false, error: 'File not found' });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, 'project_id')) {
+      const canManageProject = await projectManagedByPm(data.project_id, req.user.id);
+      if (!canManageProject) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
     }
 
     const updates = [];
@@ -124,6 +142,11 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const fileId = Number(req.params.id);
+    const canManageFile = await projectRecordManagedByPm('project_files', 'pf', fileId, req.user.id);
+    if (!canManageFile) {
+      return res.status(404).json({ success: false, error: 'File not found' });
+    }
+
     // Eksekusi query penghapusan
     await pool.query('DELETE FROM project_files WHERE id = ?', [fileId]);
     // Konfirmasi respons OK

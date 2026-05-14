@@ -201,13 +201,13 @@ paths:
   /teams:
     get:
       tags: [Dashboard]
-      summary: Daftar tim dan anggota
+      summary: Daftar tim dan anggota sesuai akses role/proyek
       responses:
         "200":
           description: Daftar tim
     post:
       tags: [Dashboard]
-      summary: Membuat tim, hanya Project Manager
+      summary: Membuat tim pada proyek yang dikelola Project Manager
       responses:
         "201":
           description: Tim dibuat
@@ -309,7 +309,7 @@ paths:
   /teams/{id}:
     put:
       tags: [Dashboard]
-      summary: Mengubah tim, hanya Project Manager
+      summary: Mengubah tim pada proyek yang dikelola Project Manager
       parameters:
         - $ref: "#/components/parameters/Id"
       responses:
@@ -317,7 +317,7 @@ paths:
           description: Tim diperbarui
     delete:
       tags: [Dashboard]
-      summary: Menghapus tim, hanya Project Manager
+      summary: Menghapus tim pada proyek yang dikelola Project Manager
       parameters:
         - $ref: "#/components/parameters/Id"
       responses:

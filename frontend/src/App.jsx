@@ -7,7 +7,7 @@
  */
 
 import { useEffect } from 'react';
-import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -34,6 +34,7 @@ function App() {
   const { user, logout } = useAuth();
   // Mengambil lokasi (URL) saat ini untuk keperluan penentuan judul dan auto-scroll
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Efek: Mengupdate <title> dokumen (tab browser) setiap kali rute berubah
   useEffect(() => {
@@ -49,6 +50,14 @@ function App() {
     });
   }, [location.pathname, location.hash]);
 
+  const handleCategoryNavClick = (event, hash) => {
+    event.preventDefault();
+    navigate(`/${hash}`);
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('dashboard-category-nav', { detail: { hash } }));
+    }, 0);
+  };
+
   return (
     <div className="app-shell">
       {/* Merender Navbar hanya jika pengguna sudah login dan bukan di halaman login */}
@@ -60,6 +69,12 @@ function App() {
               <span>{NAVBAR_NAME}</span>
             </Link>
             <div className="top-nav-actions">
+              <div className="top-nav-links" aria-label="Navigasi kategori dashboard">
+                <Link to="/#dokumen-section" onClick={(event) => handleCategoryNavClick(event, '#dokumen-section')}>Dokumen</Link>
+                <Link to="/#aktivitas-section" onClick={(event) => handleCategoryNavClick(event, '#aktivitas-section')}>Aktivitas</Link>
+                <Link to="/#kinerja-section" onClick={(event) => handleCategoryNavClick(event, '#kinerja-section')}>Kinerja</Link>
+                <Link to="/#risiko-section" onClick={(event) => handleCategoryNavClick(event, '#risiko-section')}>Risiko</Link>
+              </div>
               {/* Tombol Logout */}
               <button className="outline-button" onClick={logout}>Logout</button>
             </div>

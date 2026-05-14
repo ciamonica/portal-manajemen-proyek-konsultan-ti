@@ -14,6 +14,7 @@ const pool = require('../db');
 const { milestoneCreateSchema, parseSchema } = require('../validators/schemas');
 // Mengimpor fungsi otorisasi berdasarkan role
 const { authorizeRoles } = require('../middleware/auth');
+const { projectManagedByPm, projectRecordManagedByPm } = require('../utils/accessControl');
 
 // Membuat router
 const router = express.Router();
@@ -68,6 +69,11 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
     }
 
     const { project_id, name, description, due_date, status } = data; // Ekstrak data tervalidasi
+
+    const canManageProject = await projectManagedByPm(project_id, req.user.id);
+    if (!canManageProject) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
     
     // Menyisipkan milestone baru ke tabel database
     const [result] = await pool.query(
@@ -96,6 +102,18 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
+
+    const canManageMilestone = await projectRecordManagedByPm('milestones', 'm', milestoneId, req.user.id);
+    if (!canManageMilestone) {
+      return res.status(404).json({ success: false, error: 'Milestone not found' });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, 'project_id')) {
+      const canManageProject = await projectManagedByPm(data.project_id, req.user.id);
+      if (!canManageProject) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
+    }
     
     const updates = []; // Kumpulan klausa SET untuk SQL
     const params = []; // Kumpulan parameter bind SQL
@@ -105,6 +123,10 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
       updates.push(`${key} = ?`); // Misal: name = ?
       params.push(value); // Misal: "Fase 1 Selesai"
     });
+
+    if (!updates.length) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
     
     params.push(milestoneId); // Parameter untuk WHERE id = ?
     
@@ -127,6 +149,11 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const milestoneId = Number(req.params.id); // Mendapatkan ID dari parameter URL
+    const canManageMilestone = await projectRecordManagedByPm('milestones', 'm', milestoneId, req.user.id);
+    if (!canManageMilestone) {
+      return res.status(404).json({ success: false, error: 'Milestone not found' });
+    }
+
     // Eksekusi query penghapusan
     await pool.query('DELETE FROM milestones WHERE id = ?', [milestoneId]);
     // Mengirim respons status dengan menyertakan ID yang terhapus

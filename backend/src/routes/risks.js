@@ -14,6 +14,7 @@ const pool = require('../db');
 const { riskSchema, parseSchema } = require('../validators/schemas');
 // Mengimpor middleware hak akses
 const { authorizeRoles } = require('../middleware/auth');
+const { projectManagedByPm, projectRecordManagedByPm } = require('../utils/accessControl');
 
 const router = express.Router();
 
@@ -67,6 +68,11 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
 
+    const canManageProject = await projectManagedByPm(data.project_id, req.user.id);
+    if (!canManageProject) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
     // Insert ke tabel risks
     const [result] = await pool.query(
       'INSERT INTO risks (project_id, title, description, probability, impact, mitigation, status, owner_id, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -104,6 +110,18 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
 
+    const canManageRisk = await projectRecordManagedByPm('risks', 'r', riskId, req.user.id);
+    if (!canManageRisk) {
+      return res.status(404).json({ success: false, error: 'Risk not found' });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, 'project_id')) {
+      const canManageProject = await projectManagedByPm(data.project_id, req.user.id);
+      if (!canManageProject) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
+    }
+
     const updates = [];
     const params = [];
     // Siapkan klausa update dinamis
@@ -135,6 +153,11 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const riskId = Number(req.params.id);
+    const canManageRisk = await projectRecordManagedByPm('risks', 'r', riskId, req.user.id);
+    if (!canManageRisk) {
+      return res.status(404).json({ success: false, error: 'Risk not found' });
+    }
+
     // Eksekusi hapus di database
     await pool.query('DELETE FROM risks WHERE id = ?', [riskId]);
     res.json({ success: true, data: { id: riskId } });

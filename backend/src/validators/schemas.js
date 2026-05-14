@@ -85,6 +85,7 @@ const milestoneCreateSchema = z.object({
  * Untuk memvalidasi data pembentukan tim baru.
  */
 const teamCreateSchema = z.object({
+  project_id: z.number().int().optional(), // Proyek tempat tim bekerja
   name: z.string().min(3), // Nama tim
   member_ids: z.array(z.number().int()).optional() // Daftar ID anggota (array integer)
 });

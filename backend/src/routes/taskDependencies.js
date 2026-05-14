@@ -14,6 +14,7 @@ const pool = require('../db');
 const { taskDependencySchema, parseSchema } = require('../validators/schemas');
 // Mengimpor fungsi otorisasi
 const { authorizeRoles } = require('../middleware/auth');
+const { dependencyManagedByPm, tasksShareManagedProject } = require('../utils/accessControl');
 
 const router = express.Router();
 
@@ -65,13 +66,10 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
 
-    // Pengecekan silang: Pastikan kedua task ada di dalam proyek yang sama
-    const [[task], [dependency]] = await Promise.all([
-      pool.query('SELECT project_id FROM tasks WHERE id = ?', [data.task_id]).then(([rows]) => rows),
-      pool.query('SELECT project_id FROM tasks WHERE id = ?', [data.depends_on_task_id]).then(([rows]) => rows)
-    ]);
-    if (!task || !dependency || task.project_id !== dependency.project_id) {
-      return res.status(400).json({ success: false, error: 'Dependent tasks must exist in the same project' });
+    // Pengecekan silang: kedua task harus berada di proyek yang dikelola PM ini.
+    const canManageDependencyTasks = await tasksShareManagedProject(data.task_id, data.depends_on_task_id, req.user.id);
+    if (!canManageDependencyTasks) {
+      return res.status(403).json({ success: false, error: 'Dependent tasks must exist in the same managed project' });
     }
 
     // Insert relasi dependensi ke database
@@ -103,13 +101,15 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
 
-    // Pengecekan silang proyek untuk tugas yang baru
-    const [[task], [dependency]] = await Promise.all([
-      pool.query('SELECT project_id FROM tasks WHERE id = ?', [data.task_id]).then(([rows]) => rows),
-      pool.query('SELECT project_id FROM tasks WHERE id = ?', [data.depends_on_task_id]).then(([rows]) => rows)
-    ]);
-    if (!task || !dependency || task.project_id !== dependency.project_id) {
-      return res.status(400).json({ success: false, error: 'Dependent tasks must exist in the same project' });
+    const canManageExistingDependency = await dependencyManagedByPm(dependencyId, req.user.id);
+    if (!canManageExistingDependency) {
+      return res.status(404).json({ success: false, error: 'Dependency not found' });
+    }
+
+    // Pengecekan silang proyek untuk tugas yang baru.
+    const canManageDependencyTasks = await tasksShareManagedProject(data.task_id, data.depends_on_task_id, req.user.id);
+    if (!canManageDependencyTasks) {
+      return res.status(403).json({ success: false, error: 'Dependent tasks must exist in the same managed project' });
     }
 
     // Lakukan update relasi dependensi
@@ -141,6 +141,11 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const dependencyId = Number(req.params.id);
+    const canManageDependency = await dependencyManagedByPm(dependencyId, req.user.id);
+    if (!canManageDependency) {
+      return res.status(404).json({ success: false, error: 'Dependency not found' });
+    }
+
     // Hapus relasi
     await pool.query('DELETE FROM task_dependencies WHERE id = ?', [dependencyId]);
     // Respon dengan format standar yang menyebutkan ID file yang terhapus

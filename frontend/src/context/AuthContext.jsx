@@ -15,13 +15,18 @@ const AuthContext = createContext(null);
 
 /**
  * FUNGSI BANTUAN: readStoredUser
- * Mengambil data pengguna dari localStorage secara aman (mencegah error parsing).
+ * Mengambil data pengguna dari sessionStorage secara aman (mencegah error parsing).
  */
 function readStoredUser() {
   try {
-    const storedUser = localStorage.getItem('project_portal_user');
+    const token = sessionStorage.getItem('project_portal_token');
+    if (!token) return null;
+    const storedUser = sessionStorage.getItem('project_portal_user');
     return storedUser ? JSON.parse(storedUser) : null;
   } catch (error) {
+    sessionStorage.removeItem('project_portal_token');
+    sessionStorage.removeItem('project_portal_user');
+    localStorage.removeItem('project_portal_token');
     localStorage.removeItem('project_portal_user');
     return null;
   }
@@ -36,27 +41,56 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(readStoredUser);
   const navigate = useNavigate();
 
-  // Sinkronisasi dengan localStorage saat komponen pertama kali dimuat
+  // Sinkronisasi dengan sessionStorage saat komponen pertama kali dimuat
   useEffect(() => {
-    const token = localStorage.getItem('project_portal_token');
-    if (token) return; // Jika token ada, biarkan state tetap
-    // Jika tidak ada token, bersihkan localStorage dan state user
-    localStorage.removeItem('project_portal_user');
-    setUser(null);
+    const clearSession = () => {
+      sessionStorage.removeItem('project_portal_token');
+      sessionStorage.removeItem('project_portal_user');
+      localStorage.removeItem('project_portal_token');
+      localStorage.removeItem('project_portal_user');
+      setUser(null);
+    };
+
+    window.addEventListener('project-portal-auth-expired', clearSession);
+
+    const token = sessionStorage.getItem('project_portal_token');
+    if (!token) {
+      // Jika tidak ada token sesi, bersihkan storage lama dan state user
+      clearSession();
+      return () => window.removeEventListener('project-portal-auth-expired', clearSession);
+    }
+
+    let isMounted = true;
+    apiClient.get('/users/me')
+      .then((response) => {
+        if (!isMounted || !response.success || !response.data) return;
+        sessionStorage.setItem('project_portal_user', JSON.stringify(response.data));
+        setUser(response.data);
+      })
+      .catch(() => {
+        if (isMounted) clearSession();
+      });
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('project-portal-auth-expired', clearSession);
+    };
   }, []);
 
   /**
    * FUNGSI: login
-   * Melakukan request login ke backend dan menyimpan hasilnya di localStorage.
+   * Melakukan request login ke backend dan menyimpan hasilnya di sessionStorage.
    */
   const login = async (credentials) => {
     const response = await apiClient.post('/auth/login', credentials);
     if (!response.success) {
       throw new Error(response.error || 'Login failed');
     }
-    // Simpan token dan data user ke storage agar tetap login setelah refresh
-    localStorage.setItem('project_portal_token', response.data.token);
-    localStorage.setItem('project_portal_user', JSON.stringify(response.data.user));
+    // Simpan token dan data user hanya untuk sesi tab aktif agar refresh tetap login.
+    localStorage.removeItem('project_portal_token');
+    localStorage.removeItem('project_portal_user');
+    sessionStorage.setItem('project_portal_token', response.data.token);
+    sessionStorage.setItem('project_portal_user', JSON.stringify(response.data.user));
     // Update state global
     setUser(response.data.user);
     return response.data.user;
@@ -68,6 +102,8 @@ export function AuthProvider({ children }) {
    */
   const logout = () => {
     // Bersihkan data sesi
+    sessionStorage.removeItem('project_portal_token');
+    sessionStorage.removeItem('project_portal_user');
     localStorage.removeItem('project_portal_token');
     localStorage.removeItem('project_portal_user');
     // Kosongkan state

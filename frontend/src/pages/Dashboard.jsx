@@ -10,11 +10,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient } from '../api/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Chart, registerables } from 'chart.js';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 Chart.register(...registerables);
 Chart.defaults.font.family = 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 Chart.defaults.color = '#52677c';
 Chart.defaults.borderColor = 'rgba(82, 103, 124, 0.16)';
+Chart.defaults.devicePixelRatio = () => chartPixelRatio();
 
 const TASK_STATUS_LABELS = {
   todo: 'Belum Dikerjakan',
@@ -67,6 +70,25 @@ function labelFrom(map, value) {
   return map[value] || value || '-';
 }
 
+function categoryFromHash(hash) {
+  return {
+    '#quick-links-section': 'links',
+    '#optional-features-section': 'links',
+    '#dokumen-section': 'links',
+    '#aktivitas-section': 'work',
+    '#kinerja-section': 'monitoring',
+    '#risiko-section': 'risk',
+    '#tasks-section': 'work',
+    '#milestones-section': 'work',
+    '#teams-section': 'work',
+    '#monitoring-section': 'monitoring',
+    '#filters-section': 'monitoring',
+    '#charts-section': 'monitoring',
+    '#table-section': 'monitoring',
+    '#risk-register-section': 'risk'
+  }[hash];
+}
+
 function toDateInput(value) {
   if (!value) return '';
   if (typeof value === 'string') return value.slice(0, 10);
@@ -101,6 +123,11 @@ function clampPercent(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return 0;
   return Math.min(100, Math.max(0, Math.round(number)));
+}
+
+function chartPixelRatio() {
+  if (typeof window === 'undefined') return 2;
+  return Math.min(3, Math.max(2, window.devicePixelRatio || 1));
 }
 
 function escapeSvgText(value) {
@@ -229,17 +256,19 @@ function buildBurnDownData(tasks) {
     return { labels: [], ideal: [], actual: [] };
   }
 
-  const totalWork = sortedTasks.length * 100;
-  let completedWork = 0;
+  const totalTasks = sortedTasks.length;
+  let completedTasks = 0;
   return {
     labels: sortedTasks.map((task) => task.due_date ? formatDate(task.due_date) : task.name),
     ideal: sortedTasks.map((_, index) => {
-      if (sortedTasks.length === 1) return totalWork;
-      return Math.round(totalWork - (totalWork * index / (sortedTasks.length - 1)));
+      if (sortedTasks.length === 1) return totalTasks;
+      return Math.round(totalTasks - (totalTasks * index / (sortedTasks.length - 1)));
     }),
     actual: sortedTasks.map((task) => {
-      completedWork += clampPercent(task.progress || (task.status === 'done' ? 100 : 0));
-      return Math.max(0, totalWork - completedWork);
+      if (task.status === 'done' || clampPercent(task.progress) >= 100) {
+        completedTasks += 1;
+      }
+      return Math.max(0, totalTasks - completedTasks);
     })
   };
 }
@@ -314,6 +343,29 @@ function dashboardStats(tasks = [], projects = []) {
   return { statusCounts, projectStatus };
 }
 
+const TASK_EXPORT_HEADERS = ['Tugas', 'Proyek', 'Status', 'Peran', 'Penanggung Jawab', 'Tenggat'];
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function downloadBlob(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
@@ -332,7 +384,7 @@ export default function Dashboard() {
   const [projectForm, setProjectForm] = useState({ name: '', description: '', start_date: '', end_date: '', status: 'planning', client_id: '', pm_id: '', cover_image_url: '' });
   const [taskForm, setTaskForm] = useState({ project_id: '', name: '', description: '', assigned_to: '', status: 'todo', progress: 0, due_date: '' });
   const [milestoneForm, setMilestoneForm] = useState({ project_id: '', name: '', description: '', due_date: '', status: 'pending' });
-  const [teamForm, setTeamForm] = useState({ name: '', member_ids: [] });
+  const [teamForm, setTeamForm] = useState({ project_id: '', name: '', member_ids: [] });
   const [linkForm, setLinkForm] = useState({ project_id: '', title: '', url: '', type: 'other', sort_order: 0 });
   const [riskForm, setRiskForm] = useState({ project_id: '', title: '', description: '', probability: 'medium', impact: 'medium', mitigation: '', status: 'open', owner_id: '', due_date: '' });
   const [timeLogForm, setTimeLogForm] = useState({ task_id: '', user_id: '', hours: '', log_date: '' });
@@ -340,6 +392,12 @@ export default function Dashboard() {
   const [fileForm, setFileForm] = useState({ project_id: '', title: '', file_url: '', file_type: 'dokumen' });
   const [commentForm, setCommentForm] = useState({ task_id: '', comment: '' });
   const [activeDataForm, setActiveDataForm] = useState(user.role === 'pm' ? 'project' : user.role === 'dev' ? 'timeLog' : 'comment');
+  const [collapsedCategories, setCollapsedCategories] = useState({
+    links: true,
+    work: true,
+    monitoring: true,
+    risk: true
+  });
   const [editingProject, setEditingProject] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
   const [editingMilestone, setEditingMilestone] = useState(null);
@@ -429,19 +487,6 @@ export default function Dashboard() {
   const { statusCounts, projectStatus } = dashboardStats(filteredTasks, projects);
 
   const totalProjects = projects.length;
-  const onTrackProjects = (projectStatus.on_track || 0) + (projectStatus.planning || 0) + (projectStatus.in_progress || 0);
-  const atRiskProjects = projectStatus.at_risk || 0;
-  const delayedProjects = (projectStatus.delayed || 0) + (projectStatus.on_hold || 0);
-  const projectOverviewStatus = delayedProjects
-    ? 'Delayed'
-    : atRiskProjects
-      ? 'At Risk'
-      : 'On Track';
-  const projectOverviewStatusLabel = {
-    Delayed: 'Tertunda',
-    'At Risk': 'Berisiko',
-    'On Track': 'Sesuai Jadwal'
-  }[projectOverviewStatus];
   const milestoneProgress = useMemo(() => milestones
     .map((milestone) => ({
       ...milestone,
@@ -533,11 +578,92 @@ export default function Dashboard() {
     comment: 'comments'
   }[activeDataForm] || 'comments';
 
+  const categoryCollapsed = (category) => Boolean(collapsedCategories[category]);
+  const toggleCategory = (category) => {
+    setCollapsedCategories((prev) => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
+  const handleCategoryKeyDown = (event, category) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    toggleCategory(category);
+  };
+
+  const renderCategoryHeading = (category, sectionId, title, description, className, controlledIds) => {
+    const collapsed = categoryCollapsed(category);
+    return (
+      <section
+        id={sectionId}
+        className={`dashboard-category-heading ${className} ${collapsed ? 'is-collapsed' : 'is-expanded'}`}
+        role="button"
+        tabIndex={0}
+        aria-label={collapsed ? `Tampilkan isi ${title}` : `Sembunyikan isi ${title}`}
+        aria-expanded={!collapsed}
+        aria-controls={controlledIds}
+        title={collapsed ? `Tampilkan isi ${title}` : `Sembunyikan isi ${title}`}
+        onClick={() => toggleCategory(category)}
+        onKeyDown={(event) => handleCategoryKeyDown(event, category)}
+      >
+        <h2>{title}</h2>
+        <p>{description}</p>
+      </section>
+    );
+  };
+
   useEffect(() => {
     if (!dataFormTabs.some((tab) => tab.key === activeDataForm)) {
       setActiveDataForm(dataFormTabs[0]?.key || 'comment');
     }
   }, [activeDataForm, dataFormTabs]);
+
+  useEffect(() => {
+    if (!categoryCollapsed('monitoring')) {
+      window.setTimeout(() => {
+        statusChartRef.current?.resize();
+        projectChartRef.current?.resize();
+        burnDownChartRef.current?.resize();
+      }, 0);
+    }
+  }, [collapsedCategories.monitoring]);
+
+  useEffect(() => {
+    const expandCategoryForHash = () => {
+      const targetCategory = categoryFromHash(window.location.hash);
+      if (!targetCategory) return;
+      setCollapsedCategories((prev) => {
+        if (!prev[targetCategory]) return prev;
+        return { ...prev, [targetCategory]: false };
+      });
+      window.setTimeout(() => {
+        document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 0);
+    };
+
+    expandCategoryForHash();
+    window.addEventListener('hashchange', expandCategoryForHash);
+    return () => window.removeEventListener('hashchange', expandCategoryForHash);
+  }, []);
+
+  useEffect(() => {
+    const toggleCategoryFromNavbar = (event) => {
+      const hash = event.detail?.hash || window.location.hash;
+      const targetCategory = categoryFromHash(hash);
+      if (!targetCategory) return;
+      setCollapsedCategories((prev) => ({
+        ...prev,
+        [targetCategory]: !prev[targetCategory]
+      }));
+      window.setTimeout(() => {
+        document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 140);
+    };
+
+    window.addEventListener('dashboard-category-nav', toggleCategoryFromNavbar);
+    return () => window.removeEventListener('dashboard-category-nav', toggleCategoryFromNavbar);
+  }, []);
 
   const focusDataManagement = () => {
     setTimeout(() => {
@@ -708,6 +834,7 @@ export default function Dashboard() {
     try {
       const payload = {
         ...teamForm,
+        project_id: Number(teamForm.project_id),
         member_ids: teamForm.member_ids.map(Number)
       };
       if (editingTeam) {
@@ -715,7 +842,7 @@ export default function Dashboard() {
       } else {
         await apiClient.post('/teams', payload);
       }
-      setTeamForm({ name: '', member_ids: [] });
+      setTeamForm({ project_id: '', name: '', member_ids: [] });
       setEditingTeam(null);
       refreshData();
     } catch (error) {
@@ -727,6 +854,7 @@ export default function Dashboard() {
     setActiveDataForm('team');
     setEditingTeam(team);
     setTeamForm({
+      project_id: team.project_id ? String(team.project_id) : '',
       name: team.name || '',
       member_ids: team.members ? team.members.map((member) => String(member.id)) : []
     });
@@ -736,7 +864,7 @@ export default function Dashboard() {
   const handleTeamCreateOpen = () => {
     setActiveDataForm('team');
     setEditingTeam(null);
-    setTeamForm({ name: '', member_ids: [] });
+    setTeamForm({ project_id: '', name: '', member_ids: [] });
     focusDataManagement();
   };
 
@@ -1002,26 +1130,104 @@ export default function Dashboard() {
     }
   };
 
-  const exportTasksCsv = () => {
-    const header = ['Tugas', 'Proyek', 'Status', 'Peran', 'Penanggung Jawab', 'Tenggat'];
-    const rows = filteredTasks.map((task) => [
+  const getTaskExportRows = () => filteredTasks.map((task) => [
       task.name,
       task.project_name || '-',
       labelFrom(TASK_STATUS_LABELS, task.status),
       labelFrom(ROLE_LABELS, task.assigned_role || users.find((entry) => Number(entry.id) === Number(task.assigned_to))?.role),
       task.assigned_username || 'Belum ditugaskan',
-      toDateInput(task.due_date) || '-'
-    ]);
-    const csvContent = [header, ...rows].map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `tugas_export_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      formatDate(task.due_date)
+  ]);
+
+  const getExportFilename = (extension) => `tugas_terfilter_${new Date().toISOString().slice(0, 10)}.${extension}`;
+
+  const getFilterSummary = () => [
+    ['Status', filters.status ? labelFrom(TASK_STATUS_LABELS, filters.status) : 'Semua Status'],
+    ['Peran', filters.role ? labelFrom(ROLE_LABELS, filters.role) : 'Semua Peran'],
+    ['Dari', filters.fromDate || '-'],
+    ['Sampai', filters.toDate || '-']
+  ];
+
+  const exportTasksCsv = () => {
+    const rows = getTaskExportRows();
+    const csvContent = [TASK_EXPORT_HEADERS, ...rows]
+      .map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\r\n');
+    downloadBlob(`\ufeff${csvContent}`, getExportFilename('csv'), 'text/csv;charset=utf-8;');
+  };
+
+  const exportTasksExcel = () => {
+    const rows = getTaskExportRows();
+    const filterRows = getFilterSummary()
+      .map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`)
+      .join('');
+    const tableRows = rows.length
+      ? rows.map((row) => `<tr>${row.map((value) => `<td>${escapeHtml(value || '-')}</td>`).join('')}</tr>`).join('')
+      : `<tr><td colspan="${TASK_EXPORT_HEADERS.length}">Tidak ada data sesuai filter.</td></tr>`;
+    const html = `
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            body { font-family: Arial, sans-serif; color: #111827; }
+            h1 { font-size: 18px; margin: 0 0 12px; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+            th { background: #eaf2f8; font-weight: 700; }
+            th, td { border: 1px solid #9ca3af; padding: 8px; vertical-align: top; }
+          </style>
+        </head>
+        <body>
+          <h1>Daftar Tugas Terfilter</h1>
+          <table>${filterRows}</table>
+          <table>
+            <thead><tr>${TASK_EXPORT_HEADERS.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    downloadBlob(`\ufeff${html}`, getExportFilename('xls'), 'application/vnd.ms-excel;charset=utf-8;');
+  };
+
+  const exportTasksPdf = () => {
+    const rows = getTaskExportRows();
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const filterSummary = getFilterSummary().map(([label, value]) => `${label}: ${value}`).join('   |   ');
+
+    doc.setFontSize(16);
+    doc.text('Daftar Tugas Terfilter', 40, 42);
+    doc.setFontSize(9);
+    doc.text(filterSummary, 40, 62, { maxWidth: 760 });
+
+    autoTable(doc, {
+      startY: 82,
+      head: [TASK_EXPORT_HEADERS],
+      body: rows.length ? rows : [['Tidak ada data sesuai filter.', '-', '-', '-', '-', '-']],
+      styles: {
+        fontSize: 8,
+        cellPadding: 6,
+        overflow: 'linebreak',
+        valign: 'top'
+      },
+      headStyles: {
+        fillColor: [47, 111, 159],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold'
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      columnStyles: {
+        0: { cellWidth: 170 },
+        1: { cellWidth: 150 },
+        2: { cellWidth: 95 },
+        3: { cellWidth: 105 },
+        4: { cellWidth: 120 },
+        5: { cellWidth: 100 }
+      }
+    });
+
+    doc.save(getExportFilename('pdf'));
   };
 
   useEffect(() => {
@@ -1053,6 +1259,7 @@ export default function Dashboard() {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          devicePixelRatio: chartPixelRatio(),
           cutout: '68%',
           plugins: {
             legend: {
@@ -1093,6 +1300,7 @@ export default function Dashboard() {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          devicePixelRatio: chartPixelRatio(),
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -1104,10 +1312,12 @@ export default function Dashboard() {
           },
           scales: {
             x: {
+              alignToPixels: true,
               grid: { display: false },
               ticks: { color: '#52677c', font: { size: 12, weight: 700 } }
             },
             y: {
+              alignToPixels: true,
               beginAtZero: true,
               ticks: { precision: 0, color: '#52677c', font: { size: 12 } },
               grid: { color: 'rgba(82, 103, 124, 0.12)', drawBorder: false }
@@ -1136,7 +1346,7 @@ export default function Dashboard() {
               data: burnDownData.ideal,
               borderColor: '#64748b',
               borderDash: [8, 6],
-              borderWidth: 2.5,
+              borderWidth: 3,
               pointRadius: 0,
               borderCapStyle: 'round',
               borderJoinStyle: 'round',
@@ -1148,7 +1358,7 @@ export default function Dashboard() {
               data: burnDownData.actual,
               borderColor: '#2f8f83',
               backgroundColor: gradient,
-              borderWidth: 3.5,
+              borderWidth: 4,
               pointRadius: 4,
               pointHoverRadius: 6,
               pointBackgroundColor: '#ffffff',
@@ -1164,7 +1374,7 @@ export default function Dashboard() {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          devicePixelRatio: Math.max(1, window.devicePixelRatio || 1),
+          devicePixelRatio: chartPixelRatio(),
           layout: {
             padding: {
               top: 10,
@@ -1195,17 +1405,19 @@ export default function Dashboard() {
           },
           scales: {
             y: {
+              alignToPixels: true,
               beginAtZero: true,
               grid: { color: 'rgba(82, 103, 124, 0.16)', drawBorder: false },
               ticks: { color: '#52677c', precision: 0, font: { size: 12, weight: 700 } },
               title: {
                 display: true,
-                text: 'Sisa Pekerjaan',
+                text: 'Sisa Tugas',
                 color: '#52677c',
                 font: { weight: 800 }
               }
             },
             x: {
+              alignToPixels: true,
               grid: { display: false },
               ticks: { color: '#52677c', maxRotation: 0, autoSkipPadding: 24, font: { size: 12, weight: 700 } },
               title: {
@@ -1244,24 +1456,27 @@ export default function Dashboard() {
       <section className="dashboard-intro">
         <article className="hero-card">
           <div className="hero-header">
-            <h2>Dasbor & Navigasi Utama</h2>
+            <div>
+              <h2>Dasbor & Navigasi Utama</h2>
+              <p>Ringkasan proyek, tugas, status, dan milestone utama.</p>
+            </div>
           </div>
           <div className="overview-grid">
             <div>
-              <strong>Project Overview</strong>
+              <strong>Projects</strong>
               <p>{totalProjects}</p>
             </div>
             <div>
-              <strong>On Track</strong>
-              <p>{onTrackProjects}</p>
+              <strong>Tasks</strong>
+              <p>{tasks.length}</p>
             </div>
             <div>
-              <strong>At Risk</strong>
-              <p>{atRiskProjects}</p>
+              <strong>Completed</strong>
+              <p>{statusCounts.done || 0}</p>
             </div>
             <div>
-              <strong>Delayed</strong>
-              <p>{delayedProjects}</p>
+              <strong>Pending</strong>
+              <p>{statusCounts.todo || 0}</p>
             </div>
           </div>
           <div className="milestone-tracker">
@@ -1287,86 +1502,53 @@ export default function Dashboard() {
           </div>
         </article>
 
-        <article className="quick-links-card">
-          <div className="section-action-header">
-            <div>
-              <h3>Quick Links</h3>
-              <p>Dokumentasi dan sumber kerja proyek.</p>
+        <section className="rbac-section">
+          <div className="rbac-card">
+            <h2>Hak Akses Berdasarkan Peran</h2>
+            <p>Akses disesuaikan dengan peran pengguna.</p>
+            <div className="rbac-grid">
+              <article className="rbac-item">
+                <h3>Project Manager</h3>
+                <ul>
+                  <li>Mengatur anggaran dan alokasi tim.</li>
+                  <li>Memantau profitabilitas proyek.</li>
+                  <li>Menindaklanjuti potensi keterlambatan.</li>
+                </ul>
+              </article>
+              <article className="rbac-item">
+                <h3>Developer</h3>
+                <ul>
+                  <li>Melihat daftar tugas harian.</li>
+                  <li>Mengunggah hasil pekerjaan atau memperbarui status bug.</li>
+                  <li>Melaporkan hambatan teknis.</li>
+                </ul>
+              </article>
+              <article className="rbac-item">
+                <h3>Client</h3>
+                <ul>
+                  <li>Melihat ringkasan milestone.</li>
+                  <li>Melakukan UAT dan memberikan persetujuan.</li>
+                  <li>Melihat laporan jam kerja sesuai kontrak.</li>
+                </ul>
+              </article>
             </div>
-            {user.role === 'pm' && (
-              <button type="button" className="mini-action-button" onClick={handleLinkCreateOpen}>
-                Tambah
-              </button>
-            )}
           </div>
-          <ul>
-            {projectLinks.length ? projectLinks.map((link) => (
-              <li key={link.id} className="inline-action-row">
-                <div>
-                  <a href={link.url} target="_blank" rel="noreferrer">
-                    {link.title}
-                  </a>
-                  <small>{labelFrom(LINK_TYPE_LABELS, link.type)}{link.project_name ? ` - ${link.project_name}` : ''}</small>
-                </div>
-                {user.role === 'pm' && (
-                  <button type="button" className="text-action-button" onClick={() => handleLinkEdit(link)}>
-                    Edit
-                  </button>
-                )}
-              </li>
-            )) : <li className="empty-state">Belum ada link proyek di database.</li>}
-          </ul>
-        </article>
+        </section>
       </section>
 
-      <section id="projects-section" className="project-overview-section">
-        <div className="project-overview-card">
-          <div className="section-action-header">
-            <div>
-              <h2>Proyek</h2>
-              <p>Ringkasan proyek konsultasi TI, status, Project Manager, dan Client.</p>
-            </div>
-            {user.role === 'pm' && (
-              <button type="button" className="mini-action-button" onClick={handleProjectCreateOpen}>
-                Tambah Proyek
-              </button>
-            )}
-          </div>
-          {projects.length ? (
-            <div className="project-overview-grid">
-              {projects.map((project) => (
-                <article key={project.id} className="project-card">
-                  <img className="project-card-image" src={projectImage(project)} alt="" onError={(event) => handleProjectImageError(event, project)} />
-                  <div className="project-card-header">
-                    <h3>{project.name}</h3>
-                    <span className={`status-pill status-${project.status || 'planning'}`}>
-                      {labelFrom(PROJECT_STATUS_LABELS, project.status || 'planning')}
-                    </span>
-                  </div>
-                  <p>{project.description || 'Belum ada deskripsi.'}</p>
-                  <div className="project-meta-grid">
-                    <span>
-                      <strong>Project Manager</strong>
-                      {project.pm_username || '-'}
-                    </span>
-                    <span>
-                      <strong>Client</strong>
-                      {project.client_username || '-'}
-                    </span>
-                  </div>
-                  {user.role === 'pm' && (
-                    <div className="page-card-actions">
-                      <button type="button" onClick={() => handleProjectEdit(project)}>Edit</button>
-                      <button type="button" className="danger-button" onClick={() => handleProjectDelete(project.id)}>Hapus</button>
-                    </div>
-                  )}
-                </article>
-              ))}
-            </div>
-          ) : <p className="empty-state">Belum ada proyek.</p>}
-        </div>
-      </section>
+      {renderCategoryHeading('links', 'dokumen-section', 'Dokumen', 'Akses file, tautan, dan catatan kolaborasi proyek.', 'category-links-heading', 'links-category-content')}
 
+      {renderCategoryHeading('work', 'aktivitas-section', 'Aktivitas', 'Pantau tugas, milestone, dan susunan tim.', 'category-work-heading', 'work-category-content')}
+
+      {renderCategoryHeading('monitoring', 'kinerja-section', 'Kinerja', 'Lihat progres, beban kerja, dan laporan tugas.', 'category-monitoring-heading', 'monitoring-category-content')}
+
+      {renderCategoryHeading('risk', 'risiko-section', 'Risiko', 'Kelola potensi hambatan dan tindak lanjutnya.', 'category-risk-heading', 'risk-category-content')}
+
+      <div
+        id="work-category-content"
+        className={`category-content-group category-content-work ${categoryCollapsed('work') ? 'is-collapsed' : 'is-expanded'}`}
+        aria-hidden={categoryCollapsed('work')}
+      >
       <section id="tasks-section" className="task-management-section">
         <div className="task-management-card">
           <div className="task-management-header">
@@ -1498,7 +1680,7 @@ export default function Dashboard() {
                     <div>
                       <strong>{team.name}</strong>
                       <span>{teamMemberNames(team)}</span>
-                      <small>{team.members?.length || 0} anggota</small>
+                      <small>{team.project_name ? `${team.project_name} - ` : ''}{team.members?.length || 0} anggota</small>
                     </div>
                     {user.role === 'pm' && (
                       <button type="button" className="text-action-button" onClick={() => handleTeamEdit(team)}>
@@ -1512,8 +1694,14 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+      </div>
 
-      <section className="monitoring-section">
+      <div
+        id="monitoring-category-content"
+        className={`category-content-group category-content-monitoring ${categoryCollapsed('monitoring') ? 'is-collapsed' : 'is-expanded'}`}
+        aria-hidden={categoryCollapsed('monitoring')}
+      >
+      <section id="monitoring-section" className="monitoring-section">
         <div className="monitoring-panel">
           <div className="monitoring-header">
             <div>
@@ -1525,11 +1713,10 @@ export default function Dashboard() {
           <div className="monitoring-grid">
             <article className="monitoring-card">
               <h3>Burn-down Chart</h3>
-              <p>Perbandingan sisa pekerjaan dan waktu tersedia.</p>
+              <p>Perbandingan target dan jumlah tugas yang belum selesai.</p>
               <div className="burndown-chart-frame">
                 <canvas id="burndownChart" aria-label="Burn-down chart sisa pekerjaan dan waktu" />
               </div>
-              <p className="monitoring-note">Pantau selisih aktual dan rencana.</p>
             </article>
 
             <article className="monitoring-card">
@@ -1591,7 +1778,100 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="risk-register-section">
+      <section id="filters-section" className="filters-section">
+        <h2>Filter Tasks</h2>
+        <div className="filters-row">
+          <label className="filter-field">
+            <span>Status</span>
+            <select value={filters.status} onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}>
+              <option value="">Semua Status</option>
+              <option value="todo">Belum Dikerjakan</option>
+              <option value="in_progress">Berjalan</option>
+              <option value="done">Selesai</option>
+            </select>
+          </label>
+          <label className="filter-field">
+            <span>Peran</span>
+            <select value={filters.role} onChange={(e) => setFilters(prev => ({ ...prev, role: e.target.value }))}>
+              <option value="">Semua Peran</option>
+              <option value="pm">Project Manager</option>
+              <option value="dev">Developer</option>
+              <option value="client">Client</option>
+            </select>
+          </label>
+          <label className="filter-field">
+            <span>Dari</span>
+            <input type="date" value={filters.fromDate} onChange={(e) => setFilters(prev => ({ ...prev, fromDate: e.target.value }))} />
+          </label>
+          <label className="filter-field">
+            <span>Sampai</span>
+            <input type="date" value={filters.toDate} onChange={(e) => setFilters(prev => ({ ...prev, toDate: e.target.value }))} />
+          </label>
+          <button className="filter-action refresh-action" type="button" onClick={refreshData} disabled={loading}>
+            Perbarui
+          </button>
+        </div>
+        <div className="export-actions" aria-label="Pilihan unduh data tugas">
+          <button className="filter-action export-csv" type="button" onClick={exportTasksCsv}>
+            Unduh CSV
+          </button>
+          <button className="filter-action export-excel" type="button" onClick={exportTasksExcel}>
+            Unduh Excel
+          </button>
+          <button className="filter-action export-pdf" type="button" onClick={exportTasksPdf}>
+            Unduh PDF
+          </button>
+        </div>
+      </section>
+
+      <section id="charts-section" className="charts-section">
+        <div className="chart-card">
+          <h3>Task Status</h3>
+          <canvas id="statusChart" />
+        </div>
+        <div className="chart-card">
+          <h3>Project Status</h3>
+          <canvas id="projectChart" />
+        </div>
+      </section>
+
+      <section id="table-section" className="table-section">
+        <h2>Task List</h2>
+        <div className="data-table">
+          {loading ? <p>Memuat data...</p> : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Nama</th>
+                  <th>Proyek</th>
+                  <th>Status</th>
+                  <th>Peran</th>
+                  <th>Tenggat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTasks.map((task) => (
+                  <tr key={task.id}>
+                    <td>{task.name}</td>
+                    <td>{task.project_name || '-'}</td>
+                    <td>{labelFrom(TASK_STATUS_LABELS, task.status)}</td>
+                    <td>{labelFrom(ROLE_LABELS, task.assigned_role || users.find((entry) => Number(entry.id) === Number(task.assigned_to))?.role)}</td>
+                    <td>{formatDate(task.due_date)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
+      </div>
+
+      <div
+        id="risk-category-content"
+        className={`category-content-group category-content-risk ${categoryCollapsed('risk') ? 'is-collapsed' : 'is-expanded'}`}
+        aria-hidden={categoryCollapsed('risk')}
+      >
+      <section id="risk-register-section" className="risk-register-section">
         <div className="risk-register-card">
           <div className="section-action-header">
             <div>
@@ -1660,6 +1940,55 @@ export default function Dashboard() {
               )}
             </tbody>
           </table>
+        </div>
+      </section>
+      </div>
+
+      <section id="projects-section" className="project-overview-section">
+        <div className="project-overview-card">
+          <div className="section-action-header">
+            <div>
+              <h2>Proyek</h2>
+              <p>Ringkasan proyek konsultasi TI, status, Project Manager, dan Client.</p>
+            </div>
+            {user.role === 'pm' && (
+              <button type="button" className="mini-action-button" onClick={handleProjectCreateOpen}>
+                Tambah Proyek
+              </button>
+            )}
+          </div>
+          {projects.length ? (
+            <div className="project-overview-grid">
+              {projects.map((project) => (
+                <article key={project.id} className="project-card">
+                  <img className="project-card-image" src={projectImage(project)} alt="" onError={(event) => handleProjectImageError(event, project)} />
+                  <div className="project-card-header">
+                    <h3>{project.name}</h3>
+                    <span className={`status-pill status-${project.status || 'planning'}`}>
+                      {labelFrom(PROJECT_STATUS_LABELS, project.status || 'planning')}
+                    </span>
+                  </div>
+                  <p>{project.description || 'Belum ada deskripsi.'}</p>
+                  <div className="project-meta-grid">
+                    <span>
+                      <strong>Project Manager</strong>
+                      {project.pm_username || '-'}
+                    </span>
+                    <span>
+                      <strong>Client</strong>
+                      {project.client_username || '-'}
+                    </span>
+                  </div>
+                  {user.role === 'pm' && (
+                    <div className="page-card-actions">
+                      <button type="button" onClick={() => handleProjectEdit(project)}>Edit</button>
+                      <button type="button" className="danger-button" onClick={() => handleProjectDelete(project.id)}>Hapus</button>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : <p className="empty-state">Belum ada proyek.</p>}
         </div>
       </section>
 
@@ -1828,6 +2157,15 @@ export default function Dashboard() {
               <h3>{editingTeam ? 'Edit Tim' : 'Tambah Tim'}</h3>
               <form onSubmit={handleTeamSave}>
                 <label>
+                  Proyek
+                  <select value={teamForm.project_id} onChange={(e) => setTeamForm((prev) => ({ ...prev, project_id: e.target.value }))} required>
+                    <option value="">Pilih proyek</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>{project.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   Nama Tim
                   <input value={teamForm.name} onChange={(e) => setTeamForm((prev) => ({ ...prev, name: e.target.value }))} required />
                 </label>
@@ -1857,7 +2195,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <button type="submit">{editingTeam ? 'Simpan Perubahan' : 'Buat Tim'}</button>
-                {editingTeam && <button type="button" className="secondary-button" onClick={() => { setEditingTeam(null); setTeamForm({ name: '', member_ids: [] }); }}>Batal</button>}
+                {editingTeam && <button type="button" className="secondary-button" onClick={() => { setEditingTeam(null); setTeamForm({ project_id: '', name: '', member_ids: [] }); }}>Batal</button>}
               </form>
             </article>
 
@@ -2158,7 +2496,7 @@ export default function Dashboard() {
               <div className="data-list-scroll">
                 {teams.length ? teams.map((team) => (
                   <div key={team.id} className="data-list-item">
-                    <span>{team.name}</span>
+                    <span>{team.name}<small>{team.project_name || 'Tanpa proyek'}</small></span>
                     <div className="data-actions">
                       <button type="button" onClick={() => handleTeamEdit(team)}>Edit</button>
                       <button type="button" className="danger-button" onClick={() => handleTeamDelete(team.id)}>Hapus</button>
@@ -2269,40 +2607,45 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="rbac-section">
-        <div className="rbac-card">
-          <h2>Hak Akses Berdasarkan Peran</h2>
-          <p>Akses disesuaikan dengan peran pengguna.</p>
-          <div className="rbac-grid">
-            <article className="rbac-item">
-              <h3>Project Manager</h3>
-              <ul>
-                <li>Mengatur anggaran dan alokasi tim.</li>
-                <li>Memantau profitabilitas proyek.</li>
-                <li>Menindaklanjuti potensi keterlambatan.</li>
-              </ul>
-            </article>
-            <article className="rbac-item">
-              <h3>Developer</h3>
-              <ul>
-                <li>Melihat daftar tugas harian.</li>
-                <li>Mengunggah hasil pekerjaan atau memperbarui status bug.</li>
-                <li>Melaporkan hambatan teknis.</li>
-              </ul>
-            </article>
-            <article className="rbac-item">
-              <h3>Client</h3>
-              <ul>
-                <li>Melihat ringkasan milestone.</li>
-                <li>Melakukan UAT dan memberikan persetujuan.</li>
-                <li>Melihat laporan jam kerja sesuai kontrak.</li>
-              </ul>
-            </article>
+      <div
+        id="links-category-content"
+        className={`category-content-group category-content-links ${categoryCollapsed('links') ? 'is-collapsed' : 'is-expanded'}`}
+        aria-hidden={categoryCollapsed('links')}
+      >
+      <section id="quick-links-section" className="quick-links-section">
+        <article className="quick-links-card">
+          <div className="section-action-header">
+            <div>
+              <h3>Quick Links</h3>
+              <p>Dokumentasi dan sumber kerja proyek.</p>
+            </div>
+            {user.role === 'pm' && (
+              <button type="button" className="mini-action-button" onClick={handleLinkCreateOpen}>
+                Tambah
+              </button>
+            )}
           </div>
-        </div>
+          <ul>
+            {projectLinks.length ? projectLinks.map((link) => (
+              <li key={link.id} className="inline-action-row">
+                <div>
+                  <a href={link.url} target="_blank" rel="noreferrer">
+                    {link.title}
+                  </a>
+                  <small>{labelFrom(LINK_TYPE_LABELS, link.type)}{link.project_name ? ` - ${link.project_name}` : ''}</small>
+                </div>
+                {user.role === 'pm' && (
+                  <button type="button" className="text-action-button" onClick={() => handleLinkEdit(link)}>
+                    Edit
+                  </button>
+                )}
+              </li>
+            )) : <li className="empty-state">Belum ada link proyek di database.</li>}
+          </ul>
+        </article>
       </section>
 
-      <section className="optional-features-section">
+      <section id="optional-features-section" className="optional-features-section">
         <div className="optional-features-card">
           <h2>Fitur Tambahan</h2>
           <p>Dukungan kolaborasi dan dokumentasi proyek.</p>
@@ -2365,101 +2708,8 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+      </div>
 
-      <section className="summary-grid">
-        <article className="summary-card">
-          <h2>Projects</h2>
-          <p>{projects.length}</p>
-        </article>
-        <article className="summary-card">
-          <h2>Tasks</h2>
-          <p>{tasks.length}</p>
-        </article>
-        <article className="summary-card">
-          <h2>Completed</h2>
-          <p>{statusCounts.done || 0}</p>
-        </article>
-        <article className="summary-card">
-          <h2>Pending</h2>
-          <p>{statusCounts.todo || 0}</p>
-        </article>
-      </section>
-
-      <section className="filters-section">
-        <h2>Filter Tasks</h2>
-        <div className="filters-row">
-          <label className="filter-field">
-            <span>Status</span>
-            <select value={filters.status} onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}>
-              <option value="">Semua Status</option>
-              <option value="todo">Belum Dikerjakan</option>
-              <option value="in_progress">Berjalan</option>
-              <option value="done">Selesai</option>
-            </select>
-          </label>
-          <label className="filter-field">
-            <span>Peran</span>
-            <select value={filters.role} onChange={(e) => setFilters(prev => ({ ...prev, role: e.target.value }))}>
-              <option value="">Semua Peran</option>
-              <option value="pm">Project Manager</option>
-              <option value="dev">Developer</option>
-              <option value="client">Client</option>
-            </select>
-          </label>
-          <label className="filter-field">
-            <span>Dari</span>
-            <input type="date" value={filters.fromDate} onChange={(e) => setFilters(prev => ({ ...prev, fromDate: e.target.value }))} />
-          </label>
-          <label className="filter-field">
-            <span>Sampai</span>
-            <input type="date" value={filters.toDate} onChange={(e) => setFilters(prev => ({ ...prev, toDate: e.target.value }))} />
-          </label>
-          <button className="filter-action" type="button" onClick={() => exportTasksCsv()}>
-            Unduh CSV
-          </button>
-        </div>
-      </section>
-
-      <section className="charts-section">
-        <div className="chart-card">
-          <h3>Task Status</h3>
-          <canvas id="statusChart" />
-        </div>
-        <div className="chart-card">
-          <h3>Project Status</h3>
-          <canvas id="projectChart" />
-        </div>
-      </section>
-
-      <section className="table-section">
-        <h2>Task List</h2>
-        <div className="data-table">
-          {loading ? <p>Memuat data...</p> : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Nama</th>
-                  <th>Proyek</th>
-                  <th>Status</th>
-                  <th>Peran</th>
-                  <th>Tenggat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTasks.map((task) => (
-                  <tr key={task.id}>
-                    <td>{task.name}</td>
-                    <td>{task.project_name || '-'}</td>
-                    <td>{labelFrom(TASK_STATUS_LABELS, task.status)}</td>
-                    <td>{labelFrom(ROLE_LABELS, task.assigned_role || users.find((entry) => Number(entry.id) === Number(task.assigned_to))?.role)}</td>
-                    <td>{formatDate(task.due_date)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </section>
     </div>
   );
 }

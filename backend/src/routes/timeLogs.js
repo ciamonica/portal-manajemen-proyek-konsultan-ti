@@ -14,6 +14,7 @@ const pool = require('../db');
 const { timeLogSchema, parseSchema } = require('../validators/schemas');
 // Mengimpor middleware otorisasi
 const { authorizeRoles } = require('../middleware/auth');
+const { taskAccessibleToUser, timeLogEditableByUser } = require('../utils/accessControl');
 
 const router = express.Router();
 
@@ -66,6 +67,11 @@ router.post('/', authorizeRoles('pm', 'dev'), async (req, res, next) => {
 
     // Tentukan ID pengguna yang log-nya dicatat
     const userId = req.user.role === 'pm' ? (data.user_id || req.user.id) : req.user.id;
+
+    const canAccessTask = await taskAccessibleToUser(data.task_id, req.user);
+    if (!canAccessTask) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
     
     // Insert data ke database
     const [result] = await pool.query(
@@ -92,6 +98,18 @@ router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
     const { data, error } = parseSchema(timeLogSchema.partial(), req.body);
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
+    }
+
+    const canEditTimeLog = await timeLogEditableByUser(timeLogId, req.user);
+    if (!canEditTimeLog) {
+      return res.status(404).json({ success: false, error: 'Time log not found' });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, 'task_id')) {
+      const canAccessTask = await taskAccessibleToUser(data.task_id, req.user);
+      if (!canAccessTask) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
     }
 
     const updates = [];
@@ -137,6 +155,11 @@ router.put('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
 router.delete('/:id', authorizeRoles('pm', 'dev'), async (req, res, next) => {
   try {
     const timeLogId = Number(req.params.id);
+    const canEditTimeLog = await timeLogEditableByUser(timeLogId, req.user);
+    if (!canEditTimeLog) {
+      return res.status(404).json({ success: false, error: 'Time log not found' });
+    }
+
     const params = [timeLogId];
     let query = 'DELETE FROM time_logs WHERE id = ?';
     

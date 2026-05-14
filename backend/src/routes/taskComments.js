@@ -14,6 +14,7 @@ const pool = require('../db');
 const { taskCommentSchema, parseSchema } = require('../validators/schemas');
 // Mengimpor fungsi pembatas hak akses
 const { authorizeRoles } = require('../middleware/auth');
+const { taskAccessibleToUser, taskCommentEditableByUser } = require('../utils/accessControl');
 
 const router = express.Router();
 
@@ -65,6 +66,11 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
 
+    const canAccessTask = await taskAccessibleToUser(data.task_id, req.user);
+    if (!canAccessTask) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
     // Melakukan query Insert
     const [result] = await pool.query(
       'INSERT INTO task_comments (task_id, user_id, comment) VALUES (?, ?, ?)',
@@ -90,6 +96,18 @@ router.put('/:id', async (req, res, next) => {
     const { data, error } = parseSchema(taskCommentSchema.partial(), req.body);
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
+    }
+
+    const canEditComment = await taskCommentEditableByUser(commentId, req.user);
+    if (!canEditComment) {
+      return res.status(404).json({ success: false, error: 'Comment not found' });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, 'task_id')) {
+      const canAccessTask = await taskAccessibleToUser(data.task_id, req.user);
+      if (!canAccessTask) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
     }
 
     const updates = [];
@@ -136,6 +154,11 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const commentId = Number(req.params.id);
+    const canEditComment = await taskCommentEditableByUser(commentId, req.user);
+    if (!canEditComment) {
+      return res.status(404).json({ success: false, error: 'Comment not found' });
+    }
+
     // Jalankan perintah hapus
     await pool.query('DELETE FROM task_comments WHERE id = ?', [commentId]);
     // Kirim konfirmasi 

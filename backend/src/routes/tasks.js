@@ -14,6 +14,7 @@ const pool = require('../db');
 const { taskCreateSchema, parseSchema } = require('../validators/schemas');
 // Mengimpor middleware hak akses
 const { authorizeRoles } = require('../middleware/auth');
+const { projectManagedByPm } = require('../utils/accessControl');
 
 const router = express.Router();
 
@@ -88,6 +89,11 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
     }
     
     const { project_id, name, description, assigned_to, status, progress, due_date } = data;
+
+    const canManageProject = await projectManagedByPm(project_id, req.user.id);
+    if (!canManageProject) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
     
     // Insert ke tabel tugas
     const [result] = await pool.query(

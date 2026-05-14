@@ -51,12 +51,18 @@ INSERT INTO users (id, username, password, email, role) VALUES
 (14, 'client-nusantara', '$2b$10$vKhSix7oUCrsYvtHkG4YCeyA/BQn0vpqsx98/QmAP/7DvtUN9zJqq', 'nusantara@example.com', 'client'),
 (15, 'client-medika', '$2b$10$vKhSix7oUCrsYvtHkG4YCeyA/BQn0vpqsx98/QmAP/7DvtUN9zJqq', 'medika@example.com', 'client');
 
-INSERT INTO teams (name) VALUES
-('Core Platform Squad'),
-('Client Experience Squad'),
-('Data & Reporting Squad'),
-('Quality & Release Squad'),
-('Mobile Enablement Squad');
+INSERT INTO projects (name, description, start_date, end_date, status, client_id, pm_id, cover_image_url) VALUES
+('Portal Layanan Client', 'Portal untuk pelacakan proyek, dokumen, milestone, dan komunikasi Client.', '2025-01-06', '2025-06-30', 'completed', 12, 1, 'https://picsum.photos/seed/client-portal-dashboard/1200/675'),
+('ERP Inventory Retail', 'Modernisasi inventory multi-cabang dengan sinkronisasi stok harian dan approval gudang.', '2026-01-08', '2026-06-30', 'on_track', 13, 1, 'https://picsum.photos/seed/erp-inventory-retail/1200/675'),
+('Mobile Banking Support Desk', 'Aplikasi internal untuk ticketing support mobile banking dan laporan SLA.', '2026-02-03', '2026-07-31', 'at_risk', 14, 1, 'https://picsum.photos/seed/mobile-banking-support/1200/675'),
+('Dashboard HR Analytics', 'Dashboard people analytics untuk absensi, turnover, dan performa departemen.', '2026-04-01', '2026-08-31', 'delayed', 15, 1, 'https://picsum.photos/seed/hr-analytics-dashboard/1200/675');
+
+INSERT INTO teams (project_id, name) VALUES
+(1, 'Core Platform Squad'),
+(1, 'Client Experience Squad'),
+(2, 'Data & Reporting Squad'),
+(3, 'Quality & Release Squad'),
+(4, 'Mobile Enablement Squad');
 
 INSERT INTO team_members (team_id, user_id) VALUES
 (1, 1), (1, 4), (1, 5),
@@ -64,12 +70,6 @@ INSERT INTO team_members (team_id, user_id) VALUES
 (3, 1), (3, 5), (3, 6),
 (4, 1), (4, 7), (4, 4),
 (5, 1), (5, 6), (5, 7);
-
-INSERT INTO projects (name, description, start_date, end_date, status, client_id, pm_id, cover_image_url) VALUES
-('Portal Layanan Client', 'Portal untuk pelacakan proyek, dokumen, milestone, dan komunikasi Client.', '2025-01-06', '2025-06-30', 'completed', 12, 1, 'https://picsum.photos/seed/client-portal-dashboard/1200/675'),
-('ERP Inventory Retail', 'Modernisasi inventory multi-cabang dengan sinkronisasi stok harian dan approval gudang.', '2026-01-08', '2026-06-30', 'on_track', 13, 1, 'https://picsum.photos/seed/erp-inventory-retail/1200/675'),
-('Mobile Banking Support Desk', 'Aplikasi internal untuk ticketing support mobile banking dan laporan SLA.', '2026-02-03', '2026-07-31', 'at_risk', 14, 1, 'https://picsum.photos/seed/mobile-banking-support/1200/675'),
-('Dashboard HR Analytics', 'Dashboard people analytics untuk absensi, turnover, dan performa departemen.', '2026-04-01', '2026-08-31', 'delayed', 15, 1, 'https://picsum.photos/seed/hr-analytics-dashboard/1200/675');
 
 INSERT INTO tasks (project_id, name, description, assigned_to, status, progress, due_date)
 SELECT

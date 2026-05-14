@@ -64,11 +64,16 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
     }
     // Destrukturisasi data yang tervalidasi
     const { name, description, start_date, end_date, status, client_id, pm_id, cover_image_url } = data;
+    const assignedPmId = pm_id || req.user.id;
+
+    if (assignedPmId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
     
     // Menyimpan data proyek baru ke DB
     const [result] = await pool.query(
       'INSERT INTO projects (name, description, start_date, end_date, status, client_id, pm_id, cover_image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, description, start_date || null, end_date || null, status || 'planning', client_id || null, pm_id || req.user.id, cover_image_url || null]
+      [name, description, start_date || null, end_date || null, status || 'planning', client_id || null, assignedPmId, cover_image_url || null]
     );
 
     // Mengambil ulang data proyek yang baru dibuat
@@ -92,6 +97,10 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
     if (error) {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
+
+    if (Object.prototype.hasOwnProperty.call(data, 'pm_id') && data.pm_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
     
     const updates = []; // Array query update
     const params = []; // Parameter query
@@ -101,6 +110,10 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
       updates.push(`${key} = ?`);
       params.push(value);
     });
+
+    if (!updates.length) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
     
     // Memastikan proyek diperbarui hanya jika Project Manager yang login adalah pemiliknya
     params.push(projectId, req.user.id);

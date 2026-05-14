@@ -8,13 +8,21 @@
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
+function clearStoredSession() {
+  sessionStorage.removeItem('project_portal_token');
+  sessionStorage.removeItem('project_portal_user');
+  localStorage.removeItem('project_portal_token');
+  localStorage.removeItem('project_portal_user');
+  window.dispatchEvent(new Event('project-portal-auth-expired'));
+}
+
 /**
  * FUNGSI BANTUAN: request
- * Pembungkus fetch API dasar yang menyuntikkan token dari localStorage.
+ * Pembungkus fetch API dasar yang menyuntikkan token dari sessionStorage.
  */
 async function request(path, options = {}) {
-  // Ambil token dari local storage
-  const token = localStorage.getItem('project_portal_token');
+  // Ambil token dari session storage agar login hanya bertahan selama tab aktif.
+  const token = sessionStorage.getItem('project_portal_token');
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -36,6 +44,9 @@ async function request(path, options = {}) {
   const data = await response.json();
   // Tangani error HTTP status code
   if (!response.ok) {
+    if (response.status === 401) {
+      clearStoredSession();
+    }
     throw new Error(data.error || 'API request failed');
   }
   return data;

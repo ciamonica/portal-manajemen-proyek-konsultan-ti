@@ -38,9 +38,55 @@ CREATE TABLE IF NOT EXISTS milestones (
 
 CREATE TABLE IF NOT EXISTS teams (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  project_id INT NULL,
   name VARCHAR(100) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id)
 );
+
+SET @has_team_project_id = (
+  SELECT COUNT(*)
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'teams'
+    AND COLUMN_NAME = 'project_id'
+);
+SET @team_project_id_sql = IF(
+  @has_team_project_id = 0,
+  'ALTER TABLE teams ADD COLUMN project_id INT NULL AFTER id',
+  'SELECT 1'
+);
+PREPARE team_project_id_stmt FROM @team_project_id_sql;
+EXECUTE team_project_id_stmt;
+DEALLOCATE PREPARE team_project_id_stmt;
+
+SET @has_team_project_fk = (
+  SELECT COUNT(*)
+  FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'teams'
+    AND COLUMN_NAME = 'project_id'
+    AND REFERENCED_TABLE_NAME = 'projects'
+);
+SET @team_project_fk_sql = IF(
+  @has_team_project_fk = 0,
+  'ALTER TABLE teams ADD CONSTRAINT fk_teams_project FOREIGN KEY (project_id) REFERENCES projects(id)',
+  'SELECT 1'
+);
+PREPARE team_project_fk_stmt FROM @team_project_fk_sql;
+EXECUTE team_project_fk_stmt;
+DEALLOCATE PREPARE team_project_fk_stmt;
+
+UPDATE teams
+SET project_id = CASE id
+  WHEN 1 THEN 1
+  WHEN 2 THEN 1
+  WHEN 3 THEN 2
+  WHEN 4 THEN 3
+  WHEN 5 THEN 4
+  ELSE project_id
+END
+WHERE project_id IS NULL AND id IN (1, 2, 3, 4, 5);
 
 CREATE TABLE IF NOT EXISTS team_members (
   team_id INT,
@@ -151,6 +197,7 @@ CALL add_index_if_missing('tasks', 'idx_tasks_project_status', 'CREATE INDEX idx
 CALL add_index_if_missing('tasks', 'idx_tasks_assignee_status', 'CREATE INDEX idx_tasks_assignee_status ON tasks (assigned_to, status)');
 CALL add_index_if_missing('tasks', 'idx_tasks_due_date', 'CREATE INDEX idx_tasks_due_date ON tasks (due_date)');
 CALL add_index_if_missing('milestones', 'idx_milestones_project_status_due', 'CREATE INDEX idx_milestones_project_status_due ON milestones (project_id, status, due_date)');
+CALL add_index_if_missing('teams', 'idx_teams_project', 'CREATE INDEX idx_teams_project ON teams (project_id)');
 CALL add_index_if_missing('team_members', 'idx_team_members_user', 'CREATE INDEX idx_team_members_user ON team_members (user_id)');
 CALL add_index_if_missing('project_links', 'idx_project_links_project_type', 'CREATE INDEX idx_project_links_project_type ON project_links (project_id, type)');
 CALL add_index_if_missing('project_links', 'idx_project_links_sort_order', 'CREATE INDEX idx_project_links_sort_order ON project_links (sort_order)');

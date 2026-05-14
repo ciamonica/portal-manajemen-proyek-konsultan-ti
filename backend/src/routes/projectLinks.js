@@ -14,6 +14,7 @@ const pool = require('../db');
 const { projectLinkSchema, parseSchema } = require('../validators/schemas');
 // Mengimpor middleware hak akses
 const { authorizeRoles } = require('../middleware/auth');
+const { projectManagedByPm, projectLinkManagedByPm } = require('../utils/accessControl');
 
 const router = express.Router();
 
@@ -39,6 +40,14 @@ function appendProjectAccessFilter(query, params, user, projectColumn = 'pl.proj
     query: `${query} WHERE ${projectColumn} IS NULL OR EXISTS (SELECT 1 FROM tasks t WHERE t.project_id = ${projectColumn} AND t.assigned_to = ?)`,
     params: [...params, user.id]
   };
+}
+
+function hasExplicitProjectId(data) {
+  return Object.prototype.hasOwnProperty.call(data, 'project_id') && data.project_id !== null;
+}
+
+function normalizeProjectId(data) {
+  return hasExplicitProjectId(data) ? data.project_id : null;
 }
 
 /**
@@ -81,10 +90,17 @@ router.post('/', authorizeRoles('pm'), async (req, res, next) => {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
 
+    if (hasExplicitProjectId(data)) {
+      const canManageProject = await projectManagedByPm(data.project_id, req.user.id);
+      if (!canManageProject) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
+    }
+
     // Melakukan query INSERT
     const [result] = await pool.query(
       'INSERT INTO project_links (project_id, title, url, type, sort_order) VALUES (?, ?, ?, ?, ?)',
-      [data.project_id || null, data.title, data.url, data.type || 'other', data.sort_order || 0]
+      [normalizeProjectId(data), data.title, data.url, data.type || 'other', data.sort_order || 0]
     );
     
     // Mengambil data tautan yang baru saja disimpan
@@ -108,12 +124,24 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
       return res.status(400).json({ success: false, error: error.errors.map(e => e.message).join(', ') });
     }
 
+    const canManageLink = await projectLinkManagedByPm(linkId, req.user.id);
+    if (!canManageLink) {
+      return res.status(404).json({ success: false, error: 'Project link not found' });
+    }
+
+    if (hasExplicitProjectId(data)) {
+      const canManageProject = await projectManagedByPm(data.project_id, req.user.id);
+      if (!canManageProject) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
+    }
+
     const updates = [];
     const params = [];
     // Menyiapkan list field yang akan di-update
     Object.entries(data).forEach(([key, value]) => {
       updates.push(`${key} = ?`);
-      params.push(key === 'project_id' && !value ? null : value);
+      params.push(key === 'project_id' ? normalizeProjectId(data) : value);
     });
     
     if (!updates.length) {
@@ -139,6 +167,11 @@ router.put('/:id', authorizeRoles('pm'), async (req, res, next) => {
 router.delete('/:id', authorizeRoles('pm'), async (req, res, next) => {
   try {
     const linkId = Number(req.params.id);
+    const canManageLink = await projectLinkManagedByPm(linkId, req.user.id);
+    if (!canManageLink) {
+      return res.status(404).json({ success: false, error: 'Project link not found' });
+    }
+
     // Hapus dari database
     await pool.query('DELETE FROM project_links WHERE id = ?', [linkId]);
     // Kirim respons

@@ -69,8 +69,11 @@ CREATE TABLE IF NOT EXISTS milestones (
 
 CREATE TABLE IF NOT EXISTS teams (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  project_id INT NULL,
   name VARCHAR(100) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_teams_project (project_id),
+  FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 
 CREATE TABLE IF NOT EXISTS team_members (
