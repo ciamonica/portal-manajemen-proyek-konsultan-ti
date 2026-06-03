@@ -1,0 +1,79 @@
+PANDUAN MENJALANKAN WEBSITE TANPA DOCKER
+
+Yang perlu di-install dulu:
+1. Node.js LTS
+   Download: https://nodejs.org/
+
+2. XAMPP
+   Download: https://www.apachefriends.org/
+
+
+CARA MENJALANKAN
+
+1. Extract file ZIP project ini.
+
+2. Buka XAMPP, lalu klik Start pada MySQL.
+
+3. Import database:
+   - Buka browser: http://localhost/phpmyadmin
+   - Klik Import
+   - Pilih file database.sql dari folder project ini
+   - Klik Go / Kirim
+
+4. Buka Terminal / CMD di folder project ini.
+
+   Cara paling gampang:
+   - Buka folder project hasil extract
+   - Klik bagian alamat folder di atas
+   - Ketik cmd
+   - Tekan Enter
+
+   Kalau CMD sudah terbuka tapi belum di folder project, pindah dulu dengan perintah cd.
+   Contoh:
+   cd "C:\Users\NamaKamu\Downloads\rev2.Portal Manajemen Proyek Konsultan TI_Monica"
+
+   Catatan:
+   Ganti lokasi folder di atas sesuai tempat kamu menyimpan project.
+
+5. Jalankan backend:
+   cd backend
+   copy .env.example .env
+   npm install
+   npm run dev
+
+   Jangan tutup terminal ini.
+
+6. Buka terminal baru di folder project yang sama.
+
+7. Jalankan frontend:
+   cd frontend
+   npm install
+   npm run dev
+
+8. Buka website di browser:
+   http://localhost:5173
+
+
+AKUN LOGIN DEMO
+
+Semua akun demo memakai password yang sama:
+Password: adminfairy
+
+Pilihan username:
+- adminfairy        role Project Manager
+- dev1              role Developer
+- dev-backend       role Developer
+- dev-frontend      role Developer
+- dev-qa            role Developer
+- client1           role Client
+- client-artha      role Client
+- client-nusantara  role Client
+- client-medika     role Client
+
+
+CATATAN KALAU ERROR
+
+- Kalau npm tidak dikenali, berarti Node.js belum terinstall atau terminal perlu ditutup lalu dibuka lagi.
+- Kalau database error, pastikan MySQL di XAMPP sudah Start.
+- Kalau port 5173 sudah dipakai, terminal frontend biasanya akan memberi link lain, misalnya http://localhost:5174.
+- Kalau MySQL kamu pakai password, buka file backend/.env lalu isi bagian DB_PASSWORD.
