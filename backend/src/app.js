@@ -14,8 +14,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 // Mengimpor body-parser untuk mem-parsing request body yang masuk sebelum ke handler
 const bodyParser = require('body-parser');
-// Mengimpor path untuk menangani dan mengubah jalur direktori/file
-const path = require('path');
 
 /* --------------------------------------------------------
  * IMPOR ROUTER API
@@ -77,17 +75,6 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.json({ success: true, message: 'Backend running. Frontend available at http://localhost:5173' }));
 // Endpoint health-check untuk memastikan API beroperasi dengan baik
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'API is up' }));
-
-/**
- * ENDPOINT DOKUMENTASI API
- * Menyajikan file openapi.yaml untuk dokumentasi Swagger/OpenAPI.
- */
-app.get('/api/docs', (req, res) => {
-  // Mengambil path file openapi.yaml dari variabel lingkungan atau jalur default
-  const openApiPath = process.env.OPENAPI_PATH || path.resolve(__dirname, '../../docs/openapi.yaml');
-  // Menetapkan tipe konten menjadi text/yaml dan mengirim file sebagai respons
-  res.type('text/yaml').sendFile(path.resolve(openApiPath));
-});
 
 /* --------------------------------------------------------
  * PENDAFTARAN RUTE API
